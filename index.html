@@ -309,6 +309,140 @@
   .pix-box{background:#EAF3DE;border-radius:12px;padding:20px;text-align:center;margin-bottom:16px}
   .pix-key{font-size:18px;font-weight:700;color:#27500A;margin:8px 0;letter-spacing:.05em}
   .pix-copy{font-size:12px;padding:6px 14px;border-radius:8px;border:.5px solid #97C459;background:var(--surface);color:#3B6D11;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500}
+
+  /* ── MODERN VISUAL ENHANCEMENTS ── */
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pulse-dot { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.4); opacity: .7; } }
+  @keyframes gradient-shift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+
+  .hero {
+    background: linear-gradient(135deg, #d4edbe 0%, #b5e8d4 40%, #c8f0e0 70%, #d9f5e6 100%);
+    background-size: 300% 300%;
+    animation: gradient-shift 12s ease infinite;
+    padding: 56px 24px 48px;
+    position: relative;
+    overflow: hidden;
+  }
+  @media (prefers-color-scheme: dark) {
+    .hero {
+      background: linear-gradient(135deg, #162412 0%, #101f18 40%, #132018 70%, #0d1a10 100%);
+      background-size: 300% 300%;
+    }
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 60% 40% at 70% 30%, rgba(97,196,80,0.12) 0%, transparent 60%),
+                radial-gradient(ellipse 40% 50% at 20% 70%, rgba(29,158,117,0.10) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .hero > * { position: relative; }
+  .hero h1 { animation: fadeInUp .5s ease both; }
+  .hero p { animation: fadeInUp .5s .1s ease both; }
+  .search-box { animation: fadeInUp .5s .2s ease both; }
+  .filter-pills { animation: fadeInUp .5s .3s ease both; }
+
+  .logo-dot { animation: pulse-dot 2.5s ease-in-out infinite; }
+
+  .restaurant-card {
+    transition: transform .22s cubic-bezier(.34,1.56,.64,1), box-shadow .22s ease;
+  }
+  .restaurant-card:hover {
+    transform: translateY(-5px) scale(1.01);
+    box-shadow: 0 16px 40px rgba(59,109,17,.13), 0 0 0 0.5px rgba(0,0,0,.07);
+  }
+
+  .btn-ver {
+    transition: all .18s cubic-bezier(.34,1.56,.64,1);
+  }
+  .btn-ver:hover {
+    transform: scale(1.06);
+    background: var(--green-100);
+  }
+
+  .tab-btn {
+    transition: all .2s cubic-bezier(.34,1.56,.64,1);
+  }
+  .tab-btn.active {
+    box-shadow: 0 2px 8px rgba(59,109,17,.15);
+  }
+
+  .pill {
+    transition: all .2s cubic-bezier(.34,1.56,.64,1);
+  }
+  .pill.active {
+    transform: scale(1.04);
+    box-shadow: 0 2px 8px rgba(59,109,17,.18);
+  }
+
+  .btn-anunciar {
+    background: linear-gradient(135deg, var(--green-600), var(--teal-600));
+    transition: all .2s ease;
+    box-shadow: 0 2px 8px rgba(59,109,17,.25);
+  }
+  .btn-anunciar:hover {
+    background: linear-gradient(135deg, var(--green-800), var(--teal-800));
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(59,109,17,.35);
+  }
+
+  .search-box {
+    box-shadow: 0 8px 40px rgba(0,0,0,.12), 0 0 0 0.5px rgba(0,0,0,.06);
+    transition: box-shadow .2s ease;
+  }
+  .search-box:focus-within {
+    box-shadow: 0 8px 40px rgba(59,109,17,.18), 0 0 0 2px var(--green-400);
+  }
+
+  .filter-card {
+    transition: box-shadow .18s ease;
+  }
+  .filter-card:hover {
+    box-shadow: 0 2px 12px rgba(0,0,0,.06);
+  }
+
+  .btn-add {
+    background: linear-gradient(135deg, var(--green-600), var(--teal-600));
+    transition: all .2s cubic-bezier(.34,1.56,.64,1);
+  }
+  .btn-add:hover {
+    background: linear-gradient(135deg, var(--green-800), var(--teal-800));
+    transform: scale(1.06);
+    box-shadow: 0 2px 8px rgba(59,109,17,.3);
+  }
+
+  .modal {
+    animation: fadeInUp .28s cubic-bezier(.34,1.36,.64,1);
+  }
+
+  .avatar-btn {
+    transition: all .2s cubic-bezier(.34,1.56,.64,1);
+  }
+  .avatar-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(59,109,17,.25);
+  }
+
+  .page-btn.active {
+    background: linear-gradient(135deg, var(--green-600), var(--teal-600));
+    border-color: transparent;
+    box-shadow: 0 2px 8px rgba(59,109,17,.25);
+  }
+
+  .card-rating {
+    backdrop-filter: blur(8px);
+    box-shadow: 0 2px 8px rgba(0,0,0,.12);
+  }
+
+  .tag {
+    transition: all .15s ease;
+  }
+  .tag:hover {
+    background: var(--green-100);
+    border-color: var(--green-200);
+  }
+
 </style>
 </head>
 <body>
@@ -338,7 +472,7 @@
   <h1>Encontre restaurantes veganos<br><em>perto de você</em></h1>
   <p>Descubra pratos, compare preços e peça diretamente pelo site</p>
   <div class="search-box">
-    <input type="text" id="main-search" aria-label="Buscar restaurante, prato ou ingrediente" placeholder="Buscar restaurante, prato ou ingrediente..." oninput="onSearchInput()" onkeydown="if(event.key==='Enter'){clearTimeout(_searchDeb);currentPage=1;filterAll();}">
+    <input type="text" id="main-search" aria-label="Buscar restaurante, prato ou ingrediente" placeholder="Buscar restaurante, prato ou ingrediente..." oninput="onSearchInput()" onkeydown="if(event.key==='Enter'){clearTimeout(searchDebounce);currentPage=1;filterAll();}">
     <button class="search-clear" id="search-clear-btn" onclick="clearSearch()" aria-label="Limpar busca" title="Limpar">×</button>
     <div class="search-divider"></div>
     <select id="hero-estado" onchange="onEstadoChange()">
@@ -743,44 +877,6 @@ const PAGE_SIZE = 9;
 let searchDebounce = null;
 
 
-// ── LAZY LOADING ──────────────────────────────────────────────────────────────
-let _lazyObs = null;
-function initLazy() {
-  if (_lazyObs) _lazyObs.disconnect();
-  _lazyObs = new IntersectionObserver(entries => {
-    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('vis'); _lazyObs.unobserve(e.target); } });
-  }, { threshold: 0.08, rootMargin: '0px 0px 80px 0px' });
-}
-function observeLazy() { document.querySelectorAll('.lazy:not(.vis)').forEach(el => { if (_lazyObs) _lazyObs.observe(el); }); }
-
-// ── API DE BUSCA — índice invertido ───────────────────────────────────────────
-let _idx = null;
-function buildIdx(lista) {
-  _idx = {};
-  lista.forEach(r => {
-    const toks = new Set([r.nome, r.culinaria, r.tipo, r.estado, r.cidade, r.bairro,
-      ...(r.tags||[]), ...(r.pratos||[]).flatMap(p => [p.nome, ...(p.ingredientes||[])])
-    ].flatMap(s => String(s).toLowerCase().split(/\s+/)));
-    toks.forEach(t => { if (!_idx[t]) _idx[t] = new Set(); _idx[t].add(r.id); });
-  });
-}
-function searchIdx(q) {
-  if (!_idx || !q) return null;
-  const terms = q.toLowerCase().trim().split(/\s+/).filter(Boolean);
-  if (!terms.length) return null;
-  const sets = terms.map(t => { const s = new Set(); Object.keys(_idx).forEach(k => { if (k.includes(t)) _idx[k].forEach(id => s.add(id)); }); return s; });
-  return new Set([...sets[0]].filter(id => sets.every(s => s.has(id))));
-}
-function hlText(text, q) {
-  if (!q || !text) return escHtml(text);
-  let out = escHtml(text);
-  q.trim().split(/\s+/).filter(Boolean).forEach(t => {
-    const re = new RegExp('(' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
-    out = out.replace(re, '<mark>$1</mark>');
-  });
-  return out;
-}
-
 // ── PAGAMENTO ─────────────────────────────────────────────────────────────────
 let _payMethod = 'pix';
 function openPay() {
@@ -854,7 +950,7 @@ function fmtBRL(v) { return 'R$ ' + v.toFixed(2).replace('.', ','); }
 
 function init() {
   try { const saved = sessionStorage.getItem('vegmap_cart'); if (saved) { cartItems = JSON.parse(saved); updateCart(); } } catch(e){}
-  initLazyObserver();
+  initLazyObserver();  // canonical
   populateEstados();
   restoreFromURL();
   updateFilterCounts();
@@ -1200,7 +1296,7 @@ function renderRestaurantes(list, container) {
 
   html += renderPagination(totalPages);
   container.innerHTML = html;
-  requestAnimationFrame(() => observeLazy());
+  requestAnimationFrame(() => observeLazyCards());
 }
 
 function renderPagination(totalPages) {
