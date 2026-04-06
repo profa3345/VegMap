@@ -461,11 +461,56 @@
     <div class="cart-items-list" id="cart-items-list"></div>
   </div>
   <span class="cart-total" id="cart-total">R$ 0,00</span>
-  <button class="btn-checkout" onclick="showToast('🚀 Funcionalidade de checkout em breve!')">Finalizar</button>
+  <button class="btn-checkout" onclick="finalizarPedido()">Finalizar</button>
 </div>
 
 <!-- TOAST -->
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<!-- Banco de dados -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js';
+import { getFirestore, collection, getDocs, addDoc, query, where, orderBy, serverTimestamp }
+  from 'https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js';
+
+const _cfg = {
+  apiKey: "AIzaSyDcy2moEjosxQbaZYVq4OQ9jAlvLLiEMQE",
+  authDomain: "vegmap-44654.firebaseapp.com",
+  projectId: "vegmap-44654",
+  storageBucket: "vegmap-44654.firebasestorage.app",
+  messagingSenderId: "441209484469",
+  appId: "1:441209484469:web:870eac384075772e73bafc",
+};
+
+const db = getFirestore(initializeApp(_cfg));
+
+async function carregarRestaurantes() {
+  try {
+    const snap = await getDocs(query(
+      collection(db, 'restaurantes'),
+      where('ativo', '==', true),
+      orderBy('rating', 'desc')
+    ));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    return null;
+  }
+}
+
+async function salvarCadastroPendente(dados) {
+  await addDoc(collection(db, 'cadastros_pendentes'), {
+    ...dados, status: 'pendente', criadoEm: serverTimestamp(),
+  });
+}
+
+async function salvarPedido(dados) {
+  await addDoc(collection(db, 'pedidos'), {
+    ...dados, status: 'pendente', criadoEm: serverTimestamp(),
+  });
+}
+
+window._fb = { carregarRestaurantes, salvarCadastroPendente, salvarPedido };
+</script>
 
 <script>
 const ESTADOS = {
@@ -479,7 +524,7 @@ const ESTADOS = {
   "GO": { cidades: { "Goiânia": ["Setor Bueno","Setor Sul","Setor Oeste"] } }
 };
 
-const RESTAURANTES = [
+let RESTAURANTES = [
   { id:1, nome:"Raízes Veganas", culinaria:"Brasileira", tipo:"100% vegano", tags:["100% vegano","Delivery","Sem glúten","Orgânico"], rating:4.8, estado:"ES", cidade:"Vitória", bairro:"Praia do Canto", preco:"$$", emoji:"🌿", horario:"Ter-Dom 11h–22h", entrega:"35 min", descricao:"Cozinha brasileira 100% vegana com ingredientes orgânicos e locais. Especialistas em feijão tropeiro vegano e moquecas de banana-da-terra.", pratos:[{nome:"Moqueca de Banana",emoji:"🍌",desc:"Banana-da-terra, leite de coco, açafrão, pimentões",preco:38.90,ingredientes:["Banana-da-terra","Leite de coco","Açafrão","Pimentões","Coentro"]},{nome:"Bobó de Inhame",emoji:"🍠",desc:"Inhame cremoso com azeite de dendê vegano e castanhas",preco:36.50,ingredientes:["Inhame","Azeite de dendê","Castanhas","Coentro"]},{nome:"Feijoada Vegana",emoji:"🫘",desc:"Feijão preto com proteína de soja defumada e farofa",preco:42.00,ingredientes:["Feijão preto","Proteína de soja","Couve","Farofa de dendê"]},{nome:"Açaí Bowl",emoji:"🫐",desc:"Açaí puro com granola artesanal e frutas da estação",preco:28.00,ingredientes:["Açaí","Granola","Banana","Morango","Mel de agave"]}] },
   { id:2, nome:"Green Sushi", culinaria:"Japonesa", tipo:"Vegano e vegetariano", tags:["Delivery","Retirada","Sem glúten"], rating:4.7, estado:"SP", cidade:"São Paulo", bairro:"Pinheiros", preco:"$$$", emoji:"🍱", horario:"Qua-Seg 12h–23h", entrega:"45 min", descricao:"Sushi plant-based inspirado na culinária japonesa tradicional. Usamos vegetais da estação e proteínas vegetais premium.", pratos:[{nome:"Uramaki de Cenoura",emoji:"🥕",desc:"Cenoura defumada, cream cheese vegano e gergelim",preco:52.00,ingredientes:["Cenoura defumada","Cream cheese vegano","Gergelim","Nori","Arroz japonês"]},{nome:"Sashimi de Melancia",emoji:"🍉",desc:"Melancia marinada com shoyu e gergelim tostado",preco:46.00,ingredientes:["Melancia","Shoyu","Gengibre","Gergelim","Wasabi vegano"]},{nome:"Temaki de Cogumelo",emoji:"🍄",desc:"Cogumelo shitake, abacate e molho ponzu",preco:38.00,ingredientes:["Cogumelo shitake","Abacate","Ponzu","Nori","Pepino"]}] },
   { id:3, nome:"Fruto da Terra", culinaria:"Brasileira", tipo:"100% vegano", tags:["100% vegano","Retirada","Orgânico","Cru"], rating:4.9, estado:"ES", cidade:"Vitória", bairro:"Jardim da Penha", preco:"$", emoji:"🥭", horario:"Seg-Sex 10h–18h", entrega:"Retirada", descricao:"Restaurante especializado em alimentação viva e crudívora. Todos os ingredientes são orgânicos e certificados.", pratos:[{nome:"Lasanha Crua",emoji:"🥬",desc:"Abobrinha fatiada, castanha-de-caju e tomate seco",preco:34.00,ingredientes:["Abobrinha","Castanha-de-caju","Tomate seco","Manjericão","Azeite extra virgem"]},{nome:"Bowl Detox",emoji:"🥗",desc:"Mix de folhas, sementes ativadas e molho tahine",preco:29.00,ingredientes:["Mix de folhas","Sementes de chia","Gergelim","Tahine","Limão"]},{nome:"Cheesecake Cru",emoji:"🍰",desc:"Base de tâmaras, creme de castanha e frutas vermelhas",preco:22.00,ingredientes:["Tâmaras","Castanha de caju","Frutas vermelhas","Mel de agave","Baunilha"]}] },
@@ -516,7 +561,28 @@ function init() {
   populateEstados();
   restoreFromURL();
   updateFilterCounts();
-  filterAll();
+  showSkeleton();
+  if (window._fb) {
+    window._fb.carregarRestaurantes().then(dados => {
+      if (dados && dados.length > 0) { RESTAURANTES = dados; updateFilterCounts(); }
+      filterAll();
+    }).catch(() => filterAll());
+  } else {
+    let tentativas = 0;
+    const esperar = setInterval(() => {
+      tentativas++;
+      if (window._fb) {
+        clearInterval(esperar);
+        window._fb.carregarRestaurantes().then(dados => {
+          if (dados && dados.length > 0) { RESTAURANTES = dados; updateFilterCounts(); }
+          filterAll();
+        }).catch(() => filterAll());
+      } else if (tentativas > 20) {
+        clearInterval(esperar);
+        filterAll();
+      }
+    }, 100);
+  }
 }
 
 function restoreFromURL() {
@@ -595,6 +661,28 @@ function isAberto(horario) {
     const abre = parseInt(m[1]), fecha = parseInt(m[2]);
     return hora >= abre && hora < fecha;
   } catch(e) { return null; }
+}
+
+async function finalizarPedido() {
+  if (!cartItems.length) return;
+  const total = cartItems.reduce((s, i) => s + i.preco, 0);
+  const pedido = {
+    restaurante: cartItems[0].rest,
+    itens: cartItems.map(i => ({ nome: i.nome, preco: i.preco })),
+    total: parseFloat(total.toFixed(2)),
+  };
+  try {
+    if (window._fb) {
+      await window._fb.salvarPedido(pedido);
+      cartItems = [];
+      updateCart();
+      showToast('✅ Pedido enviado! O restaurante entrará em contato.');
+    } else {
+      showToast('🚀 Checkout em breve!');
+    }
+  } catch(err) {
+    showToast('❌ Erro ao enviar pedido. Tente novamente.');
+  }
 }
 
 function removeFromCart(idx) {
@@ -1196,7 +1284,7 @@ function closeAnuncio(e) {
     document.body.style.overflow = '';
   }
 }
-function submitAnuncio() {
+async function submitAnuncio() {
   const form = document.getElementById('anuncio-overlay');
   const required = form.querySelectorAll('input[required]');
   let valid = true;
@@ -1207,9 +1295,41 @@ function submitAnuncio() {
     else inp.style.borderColor = '';
   });
   if (!valid) { showToast('⚠️ Verifique os campos obrigatórios'); return; }
-  document.getElementById('anuncio-overlay').classList.remove('open');
-  document.body.style.overflow = '';
-  showToast('✅ Cadastro enviado! Entraremos em contato em breve.');
+
+  const btn = form.querySelector('.form-submit');
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+
+  const inputs = form.querySelectorAll('input, select');
+  const dados = {};
+  inputs.forEach(inp => { if (inp.name || inp.placeholder) dados[inp.placeholder || inp.name] = inp.value.trim(); });
+
+  // Capturar campos pelo índice dos inputs no formulário
+  const allInputs = [...form.querySelectorAll('input, select')];
+  const cadastro = {
+    nome:      allInputs[0]?.value.trim() || '',
+    estado:    allInputs[1]?.value.trim() || '',
+    cidade:    allInputs[2]?.value.trim() || '',
+    bairro:    allInputs[3]?.value.trim() || '',
+    endereco:  allInputs[4]?.value.trim() || '',
+    telefone:  allInputs[5]?.value.trim() || '',
+    instagram: allInputs[6]?.value.trim() || '',
+    tipo:      allInputs[7]?.value || '',
+    email:     allInputs[8]?.value.trim() || '',
+  };
+
+  try {
+    if (window._fb) {
+      await window._fb.salvarCadastroPendente(cadastro);
+    }
+    document.getElementById('anuncio-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+    showToast('✅ Cadastro enviado! Entraremos em contato em breve.');
+  } catch (err) {
+    showToast('❌ Erro ao enviar. Tente novamente.');
+    btn.disabled = false;
+    btn.textContent = 'Enviar cadastro';
+  }
 }
 function toggleSidebar() {
   const sidebar = document.querySelector('.sidebar');
