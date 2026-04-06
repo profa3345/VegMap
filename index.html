@@ -211,6 +211,7 @@
   .menu-item-footer { display: flex; align-items: center; justify-content: space-between; }
   .menu-item-price { font-size: 16px; font-weight: 700; color: var(--green-600); }
   .btn-add { font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: var(--radius-sm); border: none; background: var(--green-600); color: #fff; cursor: pointer; transition: background .15s; }
+  .btn-add:active{transform:scale(.92)}
   .btn-add:hover { background: var(--green-800); }
 
   /* CARRINHO */
@@ -337,7 +338,7 @@
   <h1>Encontre restaurantes veganos<br><em>perto de você</em></h1>
   <p>Descubra pratos, compare preços e peça diretamente pelo site</p>
   <div class="search-box">
-    <input type="text" id="main-search" aria-label="Buscar restaurante, prato ou ingrediente" placeholder="Buscar restaurante, prato ou ingrediente..." oninput="onSearchInput()">
+    <input type="text" id="main-search" aria-label="Buscar restaurante, prato ou ingrediente" placeholder="Buscar restaurante, prato ou ingrediente..." oninput="onSearchInput()" onkeydown="if(event.key==='Enter'){clearTimeout(_searchDeb);currentPage=1;filterAll();}">
     <button class="search-clear" id="search-clear-btn" onclick="clearSearch()" aria-label="Limpar busca" title="Limpar">×</button>
     <div class="search-divider"></div>
     <select id="hero-estado" onchange="onEstadoChange()">
@@ -710,7 +711,7 @@ const ESTADOS = {
 };
 
 let RESTAURANTES = [
-  { id:1, telefone:"27999990001", instagram:"raizesveganas", nome:"Raízes Veganas", culinaria:"Brasileira", tipo:"100% vegano", tags:["100% vegano","Delivery","Sem glúten","Orgânico"], rating:4.8, estado:"ES", cidade:"Vitória", bairro:"Praia do Canto", preco:"$$", emoji:"🌿", horario:"Ter-Dom 11h–22h", entrega:"35 min", descricao:"Cozinha brasileira 100% vegana com ingredientes orgânicos e locais. Especialistas em feijão tropeiro vegano e moquecas de banana-da-terra.", pratos:[{nome:"Moqueca de Banana",emoji:"🍌",desc:"Banana-da-terra, leite de coco, açafrão, pimentões",preco:38.90,ingredientes:["Banana-da-terra","Leite de coco","Açafrão","Pimentões","Coentro"]},{nome:"Bobó de Inhame",emoji:"🍠",desc:"Inhame cremoso com azeite de dendê vegano e castanhas",preco:36.50,ingredientes:["Inhame","Azeite de dendê","Castanhas","Coentro"]},{nome:"Feijoada Vegana",emoji:"🫘",desc:"Feijão preto com proteína de soja defumada e farofa",preco:42.00,ingredientes:["Feijão preto","Proteína de soja","Couve","Farofa de dendê"]},{nome:"Açaí Bowl",emoji:"🫐",desc:"Açaí puro com granola artesanal e frutas da estação",preco:28.00,ingredientes:["Açaí","Granola","Banana","Morango","Mel de agave"]}] },
+  { id:1, telefone:"", instagram:"raizesveganas", nome:"Raízes Veganas", culinaria:"Brasileira", tipo:"100% vegano", tags:["100% vegano","Delivery","Sem glúten","Orgânico"], rating:4.8, estado:"ES", cidade:"Vitória", bairro:"Praia do Canto", preco:"$$", emoji:"🌿", horario:"Ter-Dom 11h–22h", entrega:"35 min", descricao:"Cozinha brasileira 100% vegana com ingredientes orgânicos e locais. Especialistas em feijão tropeiro vegano e moquecas de banana-da-terra.", pratos:[{nome:"Moqueca de Banana",emoji:"🍌",desc:"Banana-da-terra, leite de coco, açafrão, pimentões",preco:38.90,ingredientes:["Banana-da-terra","Leite de coco","Açafrão","Pimentões","Coentro"]},{nome:"Bobó de Inhame",emoji:"🍠",desc:"Inhame cremoso com azeite de dendê vegano e castanhas",preco:36.50,ingredientes:["Inhame","Azeite de dendê","Castanhas","Coentro"]},{nome:"Feijoada Vegana",emoji:"🫘",desc:"Feijão preto com proteína de soja defumada e farofa",preco:42.00,ingredientes:["Feijão preto","Proteína de soja","Couve","Farofa de dendê"]},{nome:"Açaí Bowl",emoji:"🫐",desc:"Açaí puro com granola artesanal e frutas da estação",preco:28.00,ingredientes:["Açaí","Granola","Banana","Morango","Mel de agave"]}] },
   { id:2, nome:"Green Sushi", culinaria:"Japonesa", tipo:"Vegano e vegetariano", tags:["Delivery","Retirada","Sem glúten"], rating:4.7, estado:"SP", cidade:"São Paulo", bairro:"Pinheiros", preco:"$$$", emoji:"🍱", horario:"Qua-Seg 12h–23h", entrega:"45 min", descricao:"Sushi plant-based inspirado na culinária japonesa tradicional. Usamos vegetais da estação e proteínas vegetais premium.", pratos:[{nome:"Uramaki de Cenoura",emoji:"🥕",desc:"Cenoura defumada, cream cheese vegano e gergelim",preco:52.00,ingredientes:["Cenoura defumada","Cream cheese vegano","Gergelim","Nori","Arroz japonês"]},{nome:"Sashimi de Melancia",emoji:"🍉",desc:"Melancia marinada com shoyu e gergelim tostado",preco:46.00,ingredientes:["Melancia","Shoyu","Gengibre","Gergelim","Wasabi vegano"]},{nome:"Temaki de Cogumelo",emoji:"🍄",desc:"Cogumelo shitake, abacate e molho ponzu",preco:38.00,ingredientes:["Cogumelo shitake","Abacate","Ponzu","Nori","Pepino"]}] },
   { id:3, nome:"Fruto da Terra", culinaria:"Brasileira", tipo:"100% vegano", tags:["100% vegano","Retirada","Orgânico","Cru"], rating:4.9, estado:"ES", cidade:"Vitória", bairro:"Jardim da Penha", preco:"$", emoji:"🥭", horario:"Seg-Sex 10h–18h", entrega:"Retirada", descricao:"Restaurante especializado em alimentação viva e crudívora. Todos os ingredientes são orgânicos e certificados.", pratos:[{nome:"Lasanha Crua",emoji:"🥬",desc:"Abobrinha fatiada, castanha-de-caju e tomate seco",preco:34.00,ingredientes:["Abobrinha","Castanha-de-caju","Tomate seco","Manjericão","Azeite extra virgem"]},{nome:"Bowl Detox",emoji:"🥗",desc:"Mix de folhas, sementes ativadas e molho tahine",preco:29.00,ingredientes:["Mix de folhas","Sementes de chia","Gergelim","Tahine","Limão"]},{nome:"Cheesecake Cru",emoji:"🍰",desc:"Base de tâmaras, creme de castanha e frutas vermelhas",preco:22.00,ingredientes:["Tâmaras","Castanha de caju","Frutas vermelhas","Mel de agave","Baunilha"]}] },
   { id:4, nome:"Burgo Plant", culinaria:"Americana", tipo:"100% vegano", tags:["Delivery","Retirada","100% vegano"], rating:4.6, estado:"RJ", cidade:"Rio de Janeiro", bairro:"Botafogo", preco:"$$", emoji:"🍔", horario:"Ter-Dom 11h–23h", entrega:"30 min", descricao:"Hamburguerias plant-based de dar água na boca. Nossos burgers são feitos com beterraba, lentilha e quinoa.", pratos:[{nome:"Classic Plant Burger",emoji:"🍔",desc:"Burger de beterraba e lentilha, alface, tomate e maionese vegana",preco:34.90,ingredientes:["Burger de beterraba","Pão brioche vegano","Alface","Tomate","Maionese vegana","Cebola roxa"]},{nome:"BBQ Smoky Burger",emoji:"🔥",desc:"Proteína de soja defumada, cebola crispy e molho BBQ",preco:38.90,ingredientes:["Proteína de soja","Molho BBQ vegano","Cebola crispy","Picles","Mostarda"]},{nome:"Batata Frita Temperada",emoji:"🍟",desc:"Batatas com tempero especial da casa e maionese de ervas",preco:18.90,ingredientes:["Batata","Mix de temperos","Azeite","Maionese de ervas"]}] },
@@ -788,8 +789,11 @@ function openPay() {
   const resumo = document.getElementById('pay-resumo');
   if (resumo) resumo.innerHTML = `<strong>${escHtml(cartItems[0].rest)}</strong><br>${cartItems.map(i => escHtml(i.nome) + ' — ' + fmtBRL(i.preco)).join('<br>')}<br><strong style="color:var(--green-600)">Total: ${fmtBRL(tot)}</strong>`;
   setPayMethod(document.querySelector('.pay-mth[data-m="pix"]'), 'pix');
+  const pn = document.getElementById('pay-nome'); if (pn) { pn.value = ''; pn.style.borderColor = ''; }
+  const po = document.getElementById('pay-obs'); if (po) po.value = '';
   document.getElementById('pay-ov').classList.add('open');
   document.body.style.overflow = 'hidden';
+  setTimeout(() => document.getElementById('pay-nome')?.focus(), 80);
 }
 function closePay(e) {
   if (e && e.target !== document.getElementById('pay-ov')) return;
@@ -818,7 +822,10 @@ async function confirmarPedido() {
   if (!nome) { document.getElementById('pay-nome').style.borderColor = '#E24B4A'; return; }
   const btn = document.getElementById('pay-btn'); btn.disabled = true; btn.textContent = 'Enviando...';
   const tot = cartItems.reduce((s, i) => s + i.preco, 0);
-  const pedido = { restaurante: cartItems[0].rest, itens: cartItems.map(i => ({nome: i.nome, preco: i.preco})), total: parseFloat(tot.toFixed(2)), pagamento: _payMethod, cliente: nome, obs };
+  // Validar restaurante — garantir que vem dos dados reais
+  const restValid = RESTAURANTES.find(r => r.nome === cartItems[0].rest);
+  if (!restValid) { toast('❌ Erro: restaurante inválido.'); btn.disabled=false; btn.textContent='Confirmar pedido'; return; }
+  const pedido = { restaurante: restValid.nome, restauranteId: restValid.id, itens: cartItems.map(i => ({nome: i.nome, preco: i.preco})), total: parseFloat(tot.toFixed(2)), pagamento: _payMethod, cliente: nome, obs };
   try {
     let pid = '';
     if (window._fb) pid = await window._fb.salvarPedido(pedido);
@@ -841,19 +848,6 @@ async function confirmarPedido() {
 }
 
 // ── WHATSAPP NO CONTATO ───────────────────────────────────────────────────────
-function renderContato(r) {
-  const tel = (r.telefone || '').replace(/\D/g, '');
-  const msg = encodeURIComponent('Olá! Vi o ' + r.nome + ' no VegMap e gostaria de mais informações.');
-  const wa = tel ? 'https://wa.me/55' + tel + '?text=' + msg : null;
-  const ig = r.instagram ? r.instagram.replace('@','') : null;
-  return '<div style="margin-top:16px;display:flex;flex-direction:column;gap:14px">' +
-    (wa ? '<a href="' + wa + '" target="_blank" rel="noopener" class="btn-wpp"><svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12 0C5.373 0 0 5.373 0 12c0 2.136.561 4.14 1.541 5.873L.057 23.82l6.102-1.6A11.944 11.944 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.371l-.36-.213-3.624.95.968-3.532-.234-.373A9.818 9.818 0 012.182 12C2.182 6.573 6.573 2.182 12 2.182S21.818 6.573 21.818 12 17.427 21.818 12 21.818z"/></svg>Chamar no WhatsApp</a>'
-      : '<div style="font-size:14px;color:var(--muted);padding:12px;background:var(--gray-50);border-radius:var(--radius-md)">Nenhum WhatsApp cadastrado.</div>') +
-    (ig ? '<a href="https://instagram.com/' + ig + '" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--green-600);font-weight:500;text-decoration:none">📸 @' + escHtml(ig) + '</a>' : '') +
-    '<div style="font-size:13px;color:var(--muted)">📍 ' + escHtml(r.bairro) + ', ' + escHtml(r.cidade) + ' — ' + r.estado + '</div>' +
-    '<div style="font-size:13px;color:var(--muted)">🕐 ' + escHtml(r.horario) + '</div>' +
-    '</div>';
-}
 
 function fmtBRL(v) { return 'R$ ' + v.toFixed(2).replace('.', ','); }
 
@@ -969,27 +963,7 @@ function isAberto(horario) {
   } catch(e) { return null; }
 }
 
-async function finalizarPedido_old_unused() {
-  if (!cartItems.length) return;
-  const total = cartItems.reduce((s, i) => s + i.preco, 0);
-  const pedido = {
-    restaurante: cartItems[0].rest,
-    itens: cartItems.map(i => ({ nome: i.nome, preco: i.preco })),
-    total: parseFloat(total.toFixed(2)),
-  };
-  try {
-    if (window._fb) {
-      await window._fb.salvarPedido(pedido);
-      cartItems = [];
-      updateCart();
-      showToast('✅ Pedido enviado! O restaurante entrará em contato.');
-    } else {
-      showToast('🚀 Checkout em breve!');
-    }
-  } catch(err) {
-    showToast('❌ Erro ao enviar pedido. Tente novamente.');
-  }
-}
+
 
 function removeFromCart(idx) {
   cartItems.splice(idx, 1);
@@ -1842,6 +1816,11 @@ async function submitAnuncio() {
     if (empty || badEmail) { inp.style.borderColor = '#E24B4A'; valid = false; }
     else inp.style.borderColor = '';
   });
+  const telEl2 = document.getElementById('an-tel');
+  if (telEl2 && telEl2.value.replace(/[^0-9]/g,'').length < 8) {
+    telEl2.style.borderColor = '#E24B4A'; valid = false;
+    showToast('⚠️ Informe um telefone com DDD (mín. 8 dígitos)'); return;
+  }
   if (!valid) { showToast('⚠️ Verifique os campos obrigatórios'); return; }
 
   const btn = form.querySelector('.form-submit');
@@ -1874,6 +1853,7 @@ async function submitAnuncio() {
     }
     document.getElementById('anuncio-overlay').classList.remove('open');
     document.body.style.overflow = '';
+    ['an-nome','an-estado','an-cidade','an-bairro','an-end','an-tel','an-ig','an-email','an-site'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     showToast('✅ Cadastro enviado! Entraremos em contato em breve.');
   } catch (err) {
     showToast('❌ Erro ao enviar. Tente novamente.');
