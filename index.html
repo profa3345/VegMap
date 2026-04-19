@@ -6,6 +6,7 @@
 <title>EDENA — Salvando Vida, Encontrando Sabor</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,800;1,400;1,600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
 /* ═══════════════════════════════════════════
    TOKENS
@@ -23,11 +24,6 @@
   --eden-50:  #edfaef;
   --gold-500: #b5853a;
   --gold-400: #d4a44c;
-  --gold-300: #e8c278;
-  --gold-100: #faf0dc;
-  --terra-500: #7a4528;
-  --terra-300: #c4845a;
-  --terra-100: #f5e8de;
   --bg: #f8f8f6;
   --surface: #ffffff;
   --border: rgba(30,74,34,0.10);
@@ -39,1266 +35,311 @@
   --radius-lg: 20px;
   --radius-xl: 28px;
   --radius-pill: 999px;
-  --shadow-sm: 0 1px 6px rgba(13,32,16,.07), 0 0 0 .5px rgba(13,32,16,.05);
-  --shadow-md: 0 4px 20px rgba(13,32,16,.1), 0 0 0 .5px rgba(13,32,16,.06);
-  --shadow-lg: 0 10px 40px rgba(13,32,16,.14), 0 0 0 .5px rgba(13,32,16,.07);
-  --shadow-xl: 0 24px 64px rgba(13,32,16,.2), 0 0 0 .5px rgba(13,32,16,.07);
+  --shadow-sm: 0 1px 6px rgba(13,32,16,.07),0 0 0 .5px rgba(13,32,16,.05);
+  --shadow-md: 0 4px 20px rgba(13,32,16,.1),0 0 0 .5px rgba(13,32,16,.06);
+  --shadow-lg: 0 10px 40px rgba(13,32,16,.14),0 0 0 .5px rgba(13,32,16,.07);
+  --shadow-xl: 0 24px 64px rgba(13,32,16,.2),0 0 0 .5px rgba(13,32,16,.07);
   --ease-spring: cubic-bezier(.34,1.56,.64,1);
   --ease-out: cubic-bezier(0,0,.2,1);
 }
-
-/* ═══════════════════════════════════════════
-   ANIMATIONS
-═══════════════════════════════════════════ */
-@keyframes fadeUp { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
-@keyframes fadeIn { from{opacity:0} to{opacity:1} }
-@keyframes leafFloat {
-  0%,100%{transform:translateY(0) rotate(-3deg)}
-  50%{transform:translateY(-12px) rotate(3deg)}
-}
-@keyframes leafFloat2 {
-  0%,100%{transform:translateY(0) rotate(5deg)}
-  50%{transform:translateY(-9px) rotate(-5deg)}
-}
-@keyframes gradientShift {
-  0%,100%{background-position:0% 50%}
-  50%{background-position:100% 50%}
-}
-@keyframes pulseRing {
-  0%{box-shadow:0 0 0 0 rgba(74,168,87,.4)}
-  70%{box-shadow:0 0 0 10px rgba(74,168,87,0)}
-  100%{box-shadow:0 0 0 0 rgba(74,168,87,0)}
-}
-@keyframes shimmer {
-  0%{background-position:-800px 0}
-  100%{background-position:800px 0}
-}
-@keyframes spin {
-  to{transform:rotate(360deg)}
-}
+@keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes leafFloat{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-12px) rotate(3deg)}}
+@keyframes leafFloat2{0%,100%{transform:translateY(0) rotate(5deg)}50%{transform:translateY(-9px) rotate(-5deg)}}
+@keyframes gradientShift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+@keyframes pulseRing{0%{box-shadow:0 0 0 0 rgba(74,168,87,.4)}70%{box-shadow:0 0 0 10px rgba(74,168,87,0)}100%{box-shadow:0 0 0 0 rgba(74,168,87,0)}}
+@keyframes shimmer{0%{background-position:-800px 0}100%{background-position:800px 0}}
+@keyframes spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 
-/* ═══════════════════════════════════════════
-   RESET + BASE
-═══════════════════════════════════════════ */
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 a{text-decoration:none;color:inherit}
 button{cursor:pointer;font-family:inherit}
-input,select{font-family:inherit}
+input,select,textarea{font-family:inherit}
 :focus-visible{outline:2px solid var(--eden-400);outline-offset:2px}
-
-/* ═══════════════════════════════════════════
-   SCROLLBAR
-═══════════════════════════════════════════ */
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--eden-200);border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:var(--eden-300)}
 
-/* ═══════════════════════════════════════════
-   HEADER
-═══════════════════════════════════════════ */
-.header {
-  position: sticky;
-  top: 0;
-  z-index: 200;
-  background: rgba(252,252,250,.94);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--border);
-  padding: 0 24px;
-}
-.header-inner {
-  max-width: 1300px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  height: 64px;
-}
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  text-decoration: none;
-  flex-shrink: 0;
-}
-.logo-icon {
-  width: 36px;
-  height: 36px;
-  background: linear-gradient(135deg, var(--eden-700), var(--eden-500));
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  box-shadow: 0 3px 12px rgba(39,96,48,.3);
-}
-.logo-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1;
-}
-.logo-name {
-  font-family: 'Playfair Display', serif;
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--eden-700);
-  letter-spacing: -.5px;
-}
-.logo-tagline {
-  font-size: 9px;
-  font-weight: 500;
-  color: var(--gold-500);
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  margin-top: 1px;
-}
-
-.header-tabs {
-  display: flex;
-  gap: 2px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  flex: 1;
-}
+/* ═══ HEADER ═══ */
+.header{position:sticky;top:0;z-index:200;background:rgba(252,252,250,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:0 24px}
+.header-inner{max-width:1300px;margin:0 auto;display:flex;align-items:center;gap:20px;height:64px}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none;flex-shrink:0}
+.logo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--eden-700),var(--eden-500));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 3px 12px rgba(39,96,48,.3)}
+.logo-text{display:flex;flex-direction:column;line-height:1}
+.logo-name{font-family:'Playfair Display',serif;font-size:22px;font-weight:800;color:var(--eden-700);letter-spacing:-.5px}
+.logo-tagline{font-size:9px;font-weight:500;color:var(--gold-500);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px}
+.header-tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex:1}
 .header-tabs::-webkit-scrollbar{display:none}
-.tab-btn {
-  font-size: 13px;
-  font-weight: 500;
-  padding: 7px 16px;
-  border-radius: var(--radius-pill);
-  border: 1px solid transparent;
-  background: none;
-  color: var(--muted);
-  transition: all .2s var(--ease-spring);
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.tab-btn.active {
-  background: var(--eden-700);
-  color: #fff;
-  border-color: var(--eden-700);
-  box-shadow: 0 2px 8px rgba(39,96,48,.3);
-}
-.tab-btn:hover:not(.active) {
-  background: var(--eden-50);
-  color: var(--eden-700);
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-.btn-cadastrar {
-  font-size: 13px;
-  font-weight: 600;
-  padding: 9px 22px;
-  border-radius: var(--radius-pill);
-  border: none;
-  background: linear-gradient(135deg, var(--eden-700), var(--eden-500));
-  color: #fff;
-  transition: all .2s var(--ease-spring);
-  box-shadow: 0 3px 12px rgba(39,96,48,.28);
-}
+.tab-btn{font-size:13px;font-weight:500;padding:7px 16px;border-radius:var(--radius-pill);border:1px solid transparent;background:none;color:var(--muted);transition:all .2s var(--ease-spring);white-space:nowrap;display:flex;align-items:center;gap:6px}
+.tab-btn.active{background:var(--eden-700);color:#fff;border-color:var(--eden-700);box-shadow:0 2px 8px rgba(39,96,48,.3)}
+.tab-btn:hover:not(.active){background:var(--eden-50);color:var(--eden-700)}
+.header-actions{display:flex;align-items:center;gap:10px;margin-left:auto;flex-shrink:0}
+.btn-cadastrar{font-size:13px;font-weight:600;padding:9px 22px;border-radius:var(--radius-pill);border:none;background:linear-gradient(135deg,var(--eden-700),var(--eden-500));color:#fff;transition:all .2s var(--ease-spring);box-shadow:0 3px 12px rgba(39,96,48,.28)}
 .btn-cadastrar:hover{transform:translateY(-1px) scale(1.03);box-shadow:0 6px 20px rgba(39,96,48,.4)}
-.btn-entrar {
-  font-size: 13px;
-  font-weight: 500;
-  padding: 8px 16px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border);
-  background: none;
-  color: var(--muted);
-  transition: all .15s;
-}
+.btn-entrar{font-size:13px;font-weight:500;padding:8px 16px;border-radius:var(--radius-pill);border:1px solid var(--border);background:none;color:var(--muted);transition:all .15s}
 .btn-entrar:hover{background:var(--eden-50);color:var(--eden-700)}
+#user-display{font-size:13px;font-weight:600;color:var(--eden-700);display:none;align-items:center;gap:8px}
+.user-avatar{width:30px;height:30px;border-radius:50%;background:var(--eden-100);display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid var(--eden-300)}
+#btn-logout{font-size:12px;color:var(--muted);background:none;border:1px solid var(--border);padding:5px 10px;border-radius:var(--radius-pill);cursor:pointer;transition:all .15s}
+#btn-logout:hover{color:#c00;border-color:#c00}
 
-/* ═══════════════════════════════════════════
-   HERO
-═══════════════════════════════════════════ */
-.hero {
-  position: relative;
-  overflow: hidden;
-  padding: 64px 24px 56px;
-  text-align: center;
-  background: linear-gradient(160deg, #eaf6ec 0%, #ddf0e4 30%, #d4eedd 60%, #ecf7ee 100%);
-  background-size: 300% 300%;
-  animation: gradientShift 16s ease infinite;
-}
-.hero::before {
-  content:'';
-  position:absolute;inset:0;pointer-events:none;
-  background:
-    radial-gradient(ellipse 60% 70% at 10% 30%, rgba(74,168,87,.07) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 60% at 90% 20%, rgba(39,96,48,.05) 0%, transparent 60%),
-    radial-gradient(ellipse 40% 50% at 50% 100%, rgba(181,133,58,.04) 0%, transparent 60%);
-}
-
-/* Floating leaves */
-.leaf {
-  position: absolute;
-  font-size: 32px;
-  opacity: .18;
-  pointer-events: none;
-  user-select: none;
-}
+/* ═══ HERO ═══ */
+.hero{position:relative;overflow:hidden;padding:64px 24px 56px;text-align:center;background:linear-gradient(160deg,#eaf6ec 0%,#ddf0e4 30%,#d4eedd 60%,#ecf7ee 100%);background-size:300% 300%;animation:gradientShift 16s ease infinite}
+.hero::before{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 60% 70% at 10% 30%,rgba(74,168,87,.07) 0%,transparent 60%),radial-gradient(ellipse 50% 60% at 90% 20%,rgba(39,96,48,.05) 0%,transparent 60%)}
+.leaf{position:absolute;font-size:32px;opacity:.18;pointer-events:none;user-select:none}
 .leaf:nth-child(1){top:8%;left:5%;animation:leafFloat 6s ease-in-out infinite;font-size:28px}
 .leaf:nth-child(2){top:15%;right:6%;animation:leafFloat2 7s ease-in-out infinite;font-size:36px}
 .leaf:nth-child(3){top:60%;left:3%;animation:leafFloat 8s ease-in-out infinite .5s;font-size:22px;opacity:.12}
 .leaf:nth-child(4){top:70%;right:4%;animation:leafFloat2 6.5s ease-in-out infinite 1s;font-size:26px;opacity:.12}
-.leaf:nth-child(5){top:35%;left:12%;animation:leafFloat 9s ease-in-out infinite .8s;font-size:18px;opacity:.1}
-.leaf:nth-child(6){top:25%;right:14%;animation:leafFloat2 7.5s ease-in-out infinite .3s;font-size:20px;opacity:.1}
-
-.hero-content {
-  position: relative;
-  z-index: 1;
-}
-.hero-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(255,255,255,.6);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(39,96,48,.15);
-  border-radius: var(--radius-pill);
-  padding: 6px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--eden-700);
-  letter-spacing: .3px;
-  margin-bottom: 20px;
-  animation: fadeUp .5s var(--ease-out) both;
-}
-.badge-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--eden-400);
-  animation: pulseRing 2s infinite;
-  flex-shrink: 0;
-}
-
-.hero h1 {
-  font-family: 'Playfair Display', serif;
-  font-size: clamp(30px, 5.5vw, 60px);
-  font-weight: 800;
-  color: var(--eden-900);
-  line-height: 1.1;
-  letter-spacing: -.5px;
-  margin-bottom: 14px;
-  animation: fadeUp .55s .08s var(--ease-out) both;
-}
-.hero h1 em {
-  font-style: italic;
-  color: var(--eden-600);
-}
-.hero h1 .gold {
-  color: var(--gold-500);
-  font-style: normal;
-}
-.hero-sub {
-  font-size: 16px;
-  color: var(--muted);
-  margin-bottom: 36px;
-  max-width: 500px;
-  margin-left: auto;
-  margin-right: auto;
-  line-height: 1.6;
-  animation: fadeUp .55s .16s var(--ease-out) both;
-}
-
-/* Search bar */
-.search-wrap {
-  max-width: 760px;
-  margin: 0 auto;
-  animation: fadeUp .55s .24s var(--ease-out) both;
-}
-.search-box {
-  display: flex;
-  align-items: center;
-  background: var(--surface);
-  border-radius: var(--radius-xl);
-  border: 1.5px solid var(--border);
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
-  transition: box-shadow .2s var(--ease-out), border-color .2s;
-  margin-bottom: 14px;
-}
-.search-box:focus-within {
-  border-color: var(--eden-400);
-  box-shadow: 0 8px 40px rgba(39,96,48,.16), 0 0 0 3px rgba(74,168,87,.12);
-}
-.search-icon {
-  padding: 0 16px;
-  color: var(--subtle);
-  font-size: 18px;
-  flex-shrink: 0;
-}
-.search-box input {
-  flex: 1;
-  border: none;
-  outline: none;
-  font-size: 15px;
-  padding: 17px 0;
-  background: transparent;
-  color: var(--text);
-}
+.hero-content{position:relative;z-index:1}
+.hero-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.6);backdrop-filter:blur(10px);border:1px solid rgba(39,96,48,.15);border-radius:var(--radius-pill);padding:6px 14px;font-size:12px;font-weight:600;color:var(--eden-700);letter-spacing:.3px;margin-bottom:20px;animation:fadeUp .5s var(--ease-out) both}
+.badge-dot{width:7px;height:7px;border-radius:50%;background:var(--eden-400);animation:pulseRing 2s infinite;flex-shrink:0}
+.hero h1{font-family:'Playfair Display',serif;font-size:clamp(30px,5.5vw,60px);font-weight:800;color:var(--eden-900);line-height:1.1;letter-spacing:-.5px;margin-bottom:14px;animation:fadeUp .55s .08s var(--ease-out) both}
+.hero h1 em{font-style:italic;color:var(--eden-600)}
+.hero h1 .gold{color:var(--gold-500);font-style:normal}
+.hero-sub{font-size:16px;color:var(--muted);margin-bottom:36px;max-width:500px;margin-left:auto;margin-right:auto;line-height:1.6;animation:fadeUp .55s .16s var(--ease-out) both}
+.search-wrap{max-width:760px;margin:0 auto;animation:fadeUp .55s .24s var(--ease-out) both}
+.search-box{display:flex;align-items:center;background:var(--surface);border-radius:var(--radius-xl);border:1.5px solid var(--border);box-shadow:var(--shadow-lg);overflow:hidden;transition:box-shadow .2s var(--ease-out),border-color .2s;margin-bottom:14px}
+.search-box:focus-within{border-color:var(--eden-400);box-shadow:0 8px 40px rgba(39,96,48,.16),0 0 0 3px rgba(74,168,87,.12)}
+.search-icon{padding:0 16px;color:var(--subtle);font-size:18px;flex-shrink:0}
+.search-box input{flex:1;border:none;outline:none;font-size:15px;padding:17px 0;background:transparent;color:var(--text)}
 .search-box input::placeholder{color:var(--subtle)}
-.search-divider {
-  width: 1px;
-  height: 28px;
-  background: var(--border);
-  flex-shrink: 0;
-  margin: 0 4px;
-}
-.search-location {
-  padding: 0 16px;
-  font-size: 13px;
-  color: var(--muted);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-  flex-shrink: 0;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-.btn-buscar {
-  margin: 6px;
-  padding: 11px 24px;
-  border-radius: var(--radius-lg);
-  border: none;
-  background: linear-gradient(135deg, var(--eden-700), var(--eden-500));
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  transition: all .2s var(--ease-spring);
-  box-shadow: 0 3px 12px rgba(39,96,48,.3);
-  flex-shrink: 0;
-}
+.search-divider{width:1px;height:28px;background:var(--border);flex-shrink:0;margin:0 4px}
+.search-location{padding:0 12px;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0;background:none;border:none;cursor:pointer}
+.btn-buscar{margin:6px;padding:11px 24px;border-radius:var(--radius-lg);border:none;background:linear-gradient(135deg,var(--eden-700),var(--eden-500));color:#fff;font-size:14px;font-weight:600;transition:all .2s var(--ease-spring);box-shadow:0 3px 12px rgba(39,96,48,.3);flex-shrink:0}
 .btn-buscar:hover{transform:scale(1.04);box-shadow:0 6px 20px rgba(39,96,48,.4)}
+.btn-geo{margin:6px 6px 6px 0;padding:11px 13px;border-radius:var(--radius-lg);border:1.5px solid var(--eden-200);background:var(--eden-50);color:var(--eden-700);font-size:17px;transition:all .15s;flex-shrink:0}
+.btn-geo:hover{background:var(--eden-100)}
+.btn-geo.loading{animation:spin .8s linear infinite}
+.location-row{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
+.location-pill{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:var(--radius-pill);border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.45);backdrop-filter:blur(10px);font-size:12px;font-weight:500;color:var(--eden-800);cursor:pointer;transition:all .2s var(--ease-spring)}
+.location-pill:hover,.location-pill.active{background:var(--eden-700);color:#fff;border-color:var(--eden-700);transform:translateY(-1px)}
+.hero-stats{display:flex;justify-content:center;gap:40px;margin-top:40px;padding-top:32px;border-top:1px solid rgba(39,96,48,.1);animation:fadeUp .55s .32s var(--ease-out) both;flex-wrap:wrap}
+.stat-item{text-align:center}
+.stat-num{font-family:'Playfair Display',serif;font-size:28px;font-weight:800;color:var(--eden-700);display:block;line-height:1}
+.stat-label{font-size:12px;color:var(--muted);font-weight:500;margin-top:4px;display:block}
 
-/* Location pills */
-.location-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.location-pill {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(255,255,255,.5);
-  background: rgba(255,255,255,.45);
-  backdrop-filter: blur(10px);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--eden-800);
-  cursor: pointer;
-  transition: all .2s var(--ease-spring);
-}
-.location-pill:hover,.location-pill.active {
-  background: var(--eden-700);
-  color: #fff;
-  border-color: var(--eden-700);
-  transform: translateY(-1px);
-}
-
-/* Stats row */
-.hero-stats {
-  display: flex;
-  justify-content: center;
-  gap: 40px;
-  margin-top: 40px;
-  padding-top: 32px;
-  border-top: 1px solid rgba(39,96,48,.1);
-  animation: fadeUp .55s .32s var(--ease-out) both;
-}
-.stat-item {
-  text-align: center;
-}
-.stat-num {
-  font-family: 'Playfair Display', serif;
-  font-size: 28px;
-  font-weight: 800;
-  color: var(--eden-700);
-  display: block;
-  line-height: 1;
-}
-.stat-label {
-  font-size: 12px;
-  color: var(--muted);
-  font-weight: 500;
-  margin-top: 4px;
-  display: block;
-}
-
-/* ═══════════════════════════════════════════
-   CATEGORIA PILLS (horizontal scroll)
-═══════════════════════════════════════════ */
-.cats-bar {
-  background: #ffffff;
-  border-bottom: 1px solid var(--border);
-  padding: 0 24px;
-  position: sticky;
-  top: 64px;
-  z-index: 100;
-}
-.cats-inner {
-  max-width: 1300px;
-  margin: 0 auto;
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding: 12px 0;
-}
+/* ═══ CATEGORIAS ═══ */
+.cats-bar{background:#fff;border-bottom:1px solid var(--border);padding:0 24px;position:sticky;top:64px;z-index:100}
+.cats-inner{max-width:1300px;margin:0 auto;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:12px 0}
 .cats-inner::-webkit-scrollbar{display:none}
-.cat-pill {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: var(--radius-pill);
-  border: 1.5px solid rgba(0,0,0,0.08);
-  background: #f4f4f2;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--muted);
-  white-space: nowrap;
-  transition: all .2s var(--ease-spring);
-  flex-shrink: 0;
-}
-.cat-pill:hover {
-  border-color: var(--eden-300);
-  color: var(--eden-700);
-  background: var(--eden-50);
-  transform: translateY(-1px);
-}
-.cat-pill.active {
-  background: var(--eden-700);
-  border-color: var(--eden-700);
-  color: #fff;
-  box-shadow: 0 2px 10px rgba(39,96,48,.25);
-  transform: translateY(-1px);
-}
-.cat-pill .emoji {font-size:16px;line-height:1}
+.cat-pill{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius-pill);border:1.5px solid rgba(0,0,0,0.08);background:#f4f4f2;font-size:13px;font-weight:500;color:var(--muted);white-space:nowrap;transition:all .2s var(--ease-spring);flex-shrink:0}
+.cat-pill:hover{border-color:var(--eden-300);color:var(--eden-700);background:var(--eden-50);transform:translateY(-1px)}
+.cat-pill.active{background:var(--eden-700);border-color:var(--eden-700);color:#fff;box-shadow:0 2px 10px rgba(39,96,48,.25);transform:translateY(-1px)}
+.cat-pill .emoji{font-size:16px;line-height:1}
 
-/* ═══════════════════════════════════════════
-   MAIN LAYOUT
-═══════════════════════════════════════════ */
-.main {
-  max-width: 1300px;
-  margin: 0 auto;
-  padding: 28px 24px 60px;
-  display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 28px;
-  align-items: start;
-}
-
-/* ═══════════════════════════════════════════
-   SIDEBAR
-═══════════════════════════════════════════ */
-.sidebar {
-  position: sticky;
-  top: 130px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.filter-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 20px;
-  box-shadow: var(--shadow-sm);
-}
-.filter-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.filter-reset-btn {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--eden-500);
-  background: none;
-  border: none;
-  cursor: pointer;
-  text-transform: none;
-  letter-spacing: 0;
-}
-
-.filter-group { margin-bottom: 14px; }
+/* ═══ MAIN ═══ */
+.main{max-width:1300px;margin:0 auto;padding:28px 24px 60px;display:grid;grid-template-columns:280px 1fr;gap:28px;align-items:start}
+.sidebar{position:sticky;top:130px;display:flex;flex-direction:column;gap:16px}
+.filter-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow-sm)}
+.filter-title{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.filter-reset-btn{font-size:11px;font-weight:500;color:var(--eden-500);background:none;border:none;cursor:pointer;text-transform:none;letter-spacing:0}
+.filter-group{margin-bottom:14px}
 .filter-group:last-child{margin-bottom:0}
-.filter-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-  display: block;
-  margin-bottom: 6px;
-}
-.filter-select {
-  width: 100%;
-  padding: 9px 12px;
-  border-radius: var(--radius-sm);
-  border: 1.5px solid var(--border);
-  background: #f4f4f2;
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  padding-right: 32px;
-}
-.filter-select:focus{border-color:var(--eden-400)}
-
-/* Price buttons */
-.price-row {
-  display: flex;
-  gap: 6px;
-}
-.price-btn {
-  flex: 1;
-  padding: 7px 0;
-  border-radius: var(--radius-sm);
-  border: 1.5px solid var(--border);
-  background: #f4f4f2;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--muted);
-  transition: all .15s;
-}
+.filter-label{font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px}
+.filter-select{width:100%;padding:9px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:#f4f4f2;transition:border-color .15s}
+.filter-select:focus{border-color:var(--eden-400);outline:none;background:#fff}
+.price-row{display:flex;gap:6px}
+.price-btn{flex:1;padding:7px 0;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:#f4f4f2;font-size:13px;font-weight:600;color:var(--muted);transition:all .15s}
 .price-btn:hover{border-color:var(--eden-300);color:var(--eden-700)}
 .price-btn.active{border-color:var(--eden-600);background:var(--eden-50);color:var(--eden-700)}
-
-/* Rating slider */
-.rating-slider {
-  width: 100%;
-  accent-color: var(--eden-500);
-  margin-top: 6px;
-}
-.rating-display {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--eden-600);
-  margin-top: 4px;
-}
-
-/* Feature toggles */
-.toggle-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.toggle-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
-}
-.toggle-item label {
-  font-size: 13px;
-  color: var(--text);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.toggle {
-  position: relative;
-  width: 36px;
-  height: 20px;
-  flex-shrink: 0;
-}
-.toggle input {display:none}
-.toggle-track {
-  width: 100%;
-  height: 100%;
-  background: var(--eden-100);
-  border-radius: 10px;
-  transition: background .2s;
-  display: block;
-}
-.toggle input:checked + .toggle-track {background: var(--eden-500)}
-.toggle-thumb {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 14px;
-  height: 14px;
-  background: #fff;
-  border-radius: 50%;
-  transition: transform .2s var(--ease-spring);
-  box-shadow: 0 1px 4px rgba(0,0,0,.15);
-  pointer-events: none;
-}
-.toggle input:checked ~ .toggle-thumb {transform:translateX(16px)}
-
-/* Promo card */
-.promo-card {
-  background: linear-gradient(135deg, var(--eden-700), var(--eden-600));
-  border-radius: var(--radius-lg);
-  padding: 20px;
-  color: #fff;
-  position: relative;
-  overflow: hidden;
-}
-.promo-card::before {
-  content:'🌿';
-  position: absolute;
-  font-size: 80px;
-  right: -10px;
-  bottom: -10px;
-  opacity: .12;
-  line-height: 1;
-}
-.promo-card h4 {
-  font-family: 'Playfair Display', serif;
-  font-size: 16px;
-  font-weight: 700;
-  margin-bottom: 6px;
-}
-.promo-card p {
-  font-size: 12px;
-  opacity: .85;
-  line-height: 1.5;
-  margin-bottom: 14px;
-}
-.btn-promo {
-  padding: 8px 16px;
-  border-radius: var(--radius-pill);
-  border: 1.5px solid rgba(255,255,255,.4);
-  background: rgba(255,255,255,.15);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  transition: all .15s;
-  display: inline-block;
-}
+.rating-slider{width:100%;accent-color:var(--eden-500);margin-top:6px}
+.rating-display{font-size:13px;font-weight:600;color:var(--eden-600);margin-top:4px}
+.toggle-list{display:flex;flex-direction:column;gap:8px}
+.toggle-item{display:flex;align-items:center;justify-content:space-between;cursor:pointer}
+.toggle-item label{font-size:13px;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:6px}
+.toggle{position:relative;width:36px;height:20px;flex-shrink:0}
+.toggle input{display:none}
+.toggle-track{width:100%;height:100%;background:var(--eden-100);border-radius:10px;transition:background .2s;display:block}
+.toggle input:checked + .toggle-track{background:var(--eden-500)}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:transform .2s var(--ease-spring);box-shadow:0 1px 4px rgba(0,0,0,.15);pointer-events:none}
+.toggle input:checked ~ .toggle-thumb{transform:translateX(16px)}
+.promo-card{background:linear-gradient(135deg,var(--eden-700),var(--eden-600));border-radius:var(--radius-lg);padding:20px;color:#fff;position:relative;overflow:hidden}
+.promo-card::before{content:'🌿';position:absolute;font-size:80px;right:-10px;bottom:-10px;opacity:.12;line-height:1}
+.promo-card h4{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;margin-bottom:6px}
+.promo-card p{font-size:12px;opacity:.85;line-height:1.5;margin-bottom:14px}
+.btn-promo{padding:8px 16px;border-radius:var(--radius-pill);border:1.5px solid rgba(255,255,255,.4);background:rgba(255,255,255,.15);color:#fff;font-size:12px;font-weight:600;transition:all .15s;display:inline-block}
 .btn-promo:hover{background:rgba(255,255,255,.28)}
+/* Geo status */
+.geo-status{font-size:12px;padding:8px 10px;background:var(--eden-50);border-radius:var(--radius-sm);border:1px solid var(--eden-100);color:var(--eden-700);display:none}
+.geo-status.visible{display:block}
 
-/* ═══════════════════════════════════════════
-   RESULTS AREA
-═══════════════════════════════════════════ */
-.results-area {}
-
-.results-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 18px;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.results-count {
-  font-size: 14px;
-  color: var(--muted);
-}
-.results-count strong {
-  color: var(--text);
-  font-weight: 700;
-}
-.sort-view-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.sort-select {
-  padding: 7px 32px 7px 12px;
-  border-radius: var(--radius-sm);
-  border: 1.5px solid var(--border);
-  background: var(--surface);
-  font-size: 13px;
-  color: var(--text);
-  outline: none;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%237a9b7d' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  cursor: pointer;
-}
-.view-btns {
-  display: flex;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  background: var(--surface);
-}
-.view-btn {
-  padding: 7px 12px;
-  border: none;
-  background: none;
-  font-size: 15px;
-  color: var(--subtle);
-  transition: all .15s;
-}
+/* ═══ RESULTS ═══ */
+.results-area{}
+.results-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap}
+.results-count{font-size:14px;color:var(--muted)}
+.results-count strong{color:var(--text);font-weight:700}
+.sort-view-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sort-select{padding:7px 32px 7px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface);font-size:13px;color:var(--text);outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%237a9b7d' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;cursor:pointer}
+.view-btns{display:flex;border:1.5px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;background:var(--surface)}
+.view-btn{padding:7px 12px;border:none;background:none;font-size:15px;color:var(--subtle);transition:all .15s}
 .view-btn.active{background:var(--eden-50);color:var(--eden-700)}
 .view-btn:hover:not(.active){background:var(--bg)}
+.btn-mapa{padding:7px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--eden-200);background:var(--eden-50);color:var(--eden-700);font-size:13px;font-weight:600;transition:all .15s;display:flex;align-items:center;gap:5px}
+.btn-mapa:hover{background:var(--eden-100)}
 
-/* ═══════════════════════════════════════════
-   CARDS (GRID)
-═══════════════════════════════════════════ */
-.cards-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 18px;
-}
-.cards-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
+/* ═══ CARDS ═══ */
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px}
+.cards-list{display:flex;flex-direction:column;gap:14px}
+.skeleton{background:linear-gradient(90deg,var(--eden-100) 25%,var(--eden-50) 50%,var(--eden-100) 75%);background-size:800px 100%;animation:shimmer 1.4s infinite linear;border-radius:var(--radius-md)}
+.rest-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-sm);transition:all .25s var(--ease-spring);cursor:pointer;display:flex;flex-direction:column;animation:fadeUp .4s var(--ease-out) both}
+.rest-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);border-color:var(--eden-200)}
+.rest-card-list{flex-direction:row}
+.rest-card-list .card-img-wrap{width:160px;flex-shrink:0;height:auto;min-height:140px}
+.rest-card-list .card-body{flex:1}
+.card-img-wrap{position:relative;overflow:hidden;height:180px;background:linear-gradient(135deg,var(--eden-50),var(--eden-100));display:flex;align-items:center;justify-content:center}
+.card-img-inner{font-size:72px;line-height:1;transition:transform .3s var(--ease-spring)}
+.card-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.rest-card:hover .card-img-inner{transform:scale(1.1) rotate(5deg)}
+.card-badges{position:absolute;top:10px;left:10px;display:flex;flex-wrap:wrap;gap:4px;z-index:1}
+.badge{padding:3px 8px;border-radius:var(--radius-pill);font-size:10px;font-weight:700;letter-spacing:.3px}
+.badge-destaque{background:linear-gradient(135deg,#b5853a,#d4a44c);color:#fff}
+.badge-novo{background:linear-gradient(135deg,var(--eden-600),var(--eden-400));color:#fff}
+.badge-delivery{background:rgba(255,255,255,.9);color:var(--eden-700)}
+.badge-promo{background:linear-gradient(135deg,#e05a2b,#f08030);color:#fff}
+.card-fav{position:absolute;top:10px;right:10px;background:rgba(255,255,255,.85);backdrop-filter:blur(6px);border:none;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;transition:transform .2s var(--ease-spring);box-shadow:0 2px 8px rgba(0,0,0,.12);z-index:1}
+.card-fav:hover{transform:scale(1.2)}
+.card-fav.active{background:rgba(255,220,220,.9)}
+.card-body{padding:16px;display:flex;flex-direction:column;flex:1}
+.card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px}
+.card-name{font-size:16px;font-weight:700;color:var(--text);line-height:1.2}
+.card-rating{display:flex;align-items:center;gap:3px;flex-shrink:0}
+.card-rating .star{color:var(--gold-400);font-size:13px}
+.card-rating .num{font-size:13px;font-weight:700;color:var(--text)}
+.card-tipo{font-size:12px;color:var(--subtle);margin-bottom:10px}
+.card-dot{margin:0 4px}
+.card-dist{font-size:11px;color:var(--eden-600);font-weight:600;margin-left:4px;background:var(--eden-50);padding:2px 6px;border-radius:var(--radius-pill)}
+.card-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px}
+.tag{padding:3px 8px;background:var(--eden-50);border:1px solid var(--eden-100);border-radius:var(--radius-pill);font-size:11px;font-weight:500;color:var(--eden-700)}
+.card-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:auto;padding-top:10px;border-top:1px solid var(--border)}
+.meta-item{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px}
+.meta-icon{font-size:13px}
+.empty-state{grid-column:1/-1;text-align:center;padding:60px 20px}
+.empty-icon{font-size:60px;margin-bottom:16px}
+.empty-title{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--text);margin-bottom:8px}
+.empty-sub{font-size:14px;color:var(--muted)}
+.pagination{display:flex;justify-content:center;gap:6px;margin-top:32px;flex-wrap:wrap}
+.page-btn{width:38px;height:38px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface);font-size:14px;font-weight:600;color:var(--muted);transition:all .15s}
+.page-btn:hover:not(:disabled){border-color:var(--eden-300);color:var(--eden-700)}
+.page-btn.active{background:var(--eden-700);border-color:var(--eden-700);color:#fff}
+.page-btn:disabled{opacity:.4;cursor:default}
 
-/* Skeleton */
-.skeleton {
-  background: linear-gradient(90deg, var(--eden-100) 25%, var(--eden-50) 50%, var(--eden-100) 75%);
-  background-size: 800px 100%;
-  animation: shimmer 1.4s infinite linear;
-  border-radius: var(--radius-md);
-}
+/* ═══ MAPA PANEL ═══ */
+#map-panel{display:none;position:fixed;inset:0;z-index:500;background:rgba(13,32,16,.7);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px}
+#map-panel.open{display:flex}
+#map-container-wrap{background:var(--surface);border-radius:var(--radius-xl);overflow:hidden;width:100%;max-width:960px;height:82vh;display:flex;flex-direction:column;box-shadow:var(--shadow-xl)}
+.map-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.map-header h3{font-family:'Playfair Display',serif;font-size:18px;font-weight:700}
+.map-header-sub{font-size:12px;color:var(--muted);margin-top:2px}
+#leaflet-map{flex:1;min-height:0}
 
-.rest-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  box-shadow: var(--shadow-sm);
-  transition: all .25s var(--ease-spring);
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  animation: fadeUp .4s var(--ease-out) both;
-}
-.rest-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
-  border-color: var(--eden-200);
-}
+/* ═══ MODAL RESTAURANTE ═══ */
+.modal-overlay{position:fixed;inset:0;z-index:400;background:rgba(13,32,16,.6);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex;animation:fadeIn .2s var(--ease-out)}
+.modal-box{background:var(--surface);border-radius:var(--radius-xl);overflow:hidden;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-xl);animation:fadeUp .3s var(--ease-out);position:relative}
+.modal-close{position:absolute;top:14px;right:14px;background:rgba(255,255,255,.85);backdrop-filter:blur(6px);border:none;border-radius:50%;width:36px;height:36px;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--shadow-sm);z-index:10;transition:transform .2s var(--ease-spring)}
+.modal-close:hover{transform:scale(1.1)}
+.modal-hero{position:relative;height:200px;background:linear-gradient(135deg,var(--eden-50),var(--eden-100));display:flex;align-items:center;justify-content:center;font-size:80px;overflow:hidden}
+.modal-body{padding:24px}
+.modal-name{font-family:'Playfair Display',serif;font-size:24px;font-weight:800;margin-bottom:4px}
+.modal-tipo{font-size:14px;color:var(--muted);margin-bottom:16px}
+.modal-info-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.modal-info-item{font-size:13px;color:var(--muted);background:var(--bg);padding:6px 12px;border-radius:var(--radius-pill);border:1px solid var(--border)}
+.modal-section-title{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:16px 0 10px}
+.menu-items{display:flex;flex-direction:column;gap:10px}
+.menu-item{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:var(--radius-md);gap:12px}
+.menu-item-name{font-size:14px;font-weight:600}
+.menu-item-desc{font-size:12px;color:var(--muted);margin-top:2px}
+.menu-item-price{font-size:14px;font-weight:700;color:var(--eden-600);white-space:nowrap}
+.btn-pedir{padding:6px 14px;border-radius:var(--radius-pill);border:none;background:var(--eden-700);color:#fff;font-size:12px;font-weight:600;transition:all .15s}
+.btn-pedir:hover{background:var(--eden-600)}
+.modal-action-btns{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.btn-ver-site{display:block;width:100%;padding:14px;border-radius:var(--radius-lg);border:none;background:linear-gradient(135deg,var(--eden-700),var(--eden-500));color:#fff;font-size:15px;font-weight:700;text-align:center;cursor:pointer;transition:all .2s}
+.btn-ver-site:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(39,96,48,.3)}
+.modal-map-btn{display:block;width:100%;padding:12px;border-radius:var(--radius-lg);border:1.5px solid var(--eden-200);background:var(--eden-50);color:var(--eden-700);font-size:14px;font-weight:600;text-align:center;text-decoration:none;transition:all .15s}
+.modal-map-btn:hover{background:var(--eden-100)}
+.modal-tel-btn{display:block;width:100%;padding:12px;border-radius:var(--radius-lg);border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;font-weight:600;text-align:center;text-decoration:none;transition:all .15s}
+.modal-tel-btn:hover{background:var(--bg)}
 
-.card-img-wrap {
-  position: relative;
-  overflow: hidden;
-  height: 180px;
-  flex-shrink: 0;
-}
-.card-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform .4s var(--ease-out);
-  background: var(--eden-100);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 48px;
-}
-.rest-card:hover .card-img-inner {transform: scale(1.06)}
-.card-img-inner {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 56px;
-  background: linear-gradient(135deg, var(--eden-100), var(--eden-50));
-  transition: transform .4s var(--ease-out);
-}
+/* ═══ MODAL CADASTRO ═══ */
+.cad-overlay{position:fixed;inset:0;z-index:600;background:rgba(13,32,16,.7);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
+.cad-overlay.open{display:flex;animation:fadeIn .2s var(--ease-out)}
+.cad-box{background:var(--surface);border-radius:var(--radius-xl);width:100%;max-width:580px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-xl);animation:fadeUp .3s var(--ease-out)}
+.cad-header{padding:24px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:5}
+.cad-header h2{font-family:'Playfair Display',serif;font-size:20px;font-weight:800}
+.btn-fechar{background:none;border:none;font-size:22px;color:var(--muted);cursor:pointer;padding:4px;line-height:1;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.btn-fechar:hover{background:var(--bg);color:var(--text)}
+.cad-body{padding:24px;display:flex;flex-direction:column;gap:16px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-group label{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.form-group input,.form-group select,.form-group textarea{padding:10px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:#f4f4f2;font-size:14px;transition:all .15s}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--eden-400);background:#fff}
+.form-group input.error,.form-group select.error{border-color:#e53e3e;background:#fff5f5}
+.form-group textarea{resize:vertical;min-height:80px}
+.img-upload-zone{border:2px dashed var(--eden-200);border-radius:var(--radius-md);padding:20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--eden-50)}
+.img-upload-zone:hover{border-color:var(--eden-400);background:var(--eden-100)}
+.img-upload-zone input{display:none}
+#img-preview{max-width:100%;border-radius:var(--radius-md);max-height:160px;object-fit:cover;display:none;margin-top:10px}
+.checkbox-row{display:flex;align-items:center;gap:8px}
+.checkbox-row input[type="checkbox"]{width:16px;height:16px;accent-color:var(--eden-600)}
+.checkbox-row label{font-size:13px;color:var(--text);text-transform:none;letter-spacing:0;font-weight:500;cursor:pointer}
+.btn-salvar-rest{padding:14px;border-radius:var(--radius-lg);border:none;background:linear-gradient(135deg,var(--eden-700),var(--eden-500));color:#fff;font-size:15px;font-weight:700;transition:all .2s;box-shadow:0 3px 12px rgba(39,96,48,.3);cursor:pointer}
+.btn-salvar-rest:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 20px rgba(39,96,48,.4)}
+.btn-salvar-rest:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.cad-info-box{font-size:12px;color:var(--muted);background:var(--eden-50);padding:12px;border-radius:var(--radius-md);border:1px solid var(--eden-100);line-height:1.5}
+#cad-status{text-align:center;font-size:13px;min-height:20px;font-weight:500}
 
-.card-badges {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-}
-.badge {
-  padding: 3px 8px;
-  border-radius: var(--radius-pill);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .3px;
-  backdrop-filter: blur(8px);
-}
-.badge-verde { background: rgba(39,96,48,.85); color: #fff; }
-.badge-destaque { background: rgba(181,133,58,.9); color: #fff; }
-.badge-novo { background: rgba(74,168,87,.9); color: #fff; }
-.badge-delivery { background: rgba(255,255,255,.85); color: var(--eden-700); }
+/* ═══ LOGIN MODAL ═══ */
+.login-overlay{position:fixed;inset:0;z-index:700;background:rgba(13,32,16,.7);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:20px}
+.login-overlay.open{display:flex;animation:fadeIn .2s var(--ease-out)}
+.login-box{background:var(--surface);border-radius:var(--radius-xl);width:100%;max-width:400px;box-shadow:var(--shadow-xl);animation:fadeUp .3s var(--ease-out);overflow:hidden}
+.login-header{padding:24px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.login-header h2{font-family:'Playfair Display',serif;font-size:22px;font-weight:800}
+.login-body{padding:24px;display:flex;flex-direction:column;gap:14px}
+.btn-google{padding:13px;border-radius:var(--radius-lg);border:1.5px solid var(--border);background:#fff;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px;transition:all .15s;cursor:pointer;width:100%}
+.btn-google:hover{background:#f4f4f2;box-shadow:var(--shadow-sm)}
+.login-divider{display:flex;align-items:center;gap:10px;color:var(--subtle);font-size:12px}
+.login-divider::before,.login-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.btn-email-login{padding:14px;border-radius:var(--radius-lg);border:none;background:linear-gradient(135deg,var(--eden-700),var(--eden-500));color:#fff;font-size:15px;font-weight:700;transition:all .2s;cursor:pointer;width:100%}
+.btn-email-login:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(39,96,48,.4)}
+.login-switch{text-align:center;font-size:13px;color:var(--muted)}
+.login-switch button{background:none;border:none;color:var(--eden-600);font-weight:600;cursor:pointer;text-decoration:underline}
+#login-error{color:#c00;font-size:13px;text-align:center;min-height:16px}
 
-.card-fav {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: rgba(255,255,255,.85);
-  backdrop-filter: blur(8px);
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 15px;
-  transition: all .2s var(--ease-spring);
-}
-.card-fav:hover{transform:scale(1.2);background:#fff}
-.card-fav.active{color:#e53535}
+/* ═══ TOAST ═══ */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--eden-800);color:#fff;padding:12px 20px;border-radius:var(--radius-pill);font-size:14px;font-weight:500;box-shadow:var(--shadow-lg);display:none;align-items:center;gap:8px;z-index:9999;white-space:nowrap;max-width:90vw;animation:fadeUp .3s var(--ease-out)}
+#toast.hide{animation:fadeUp .3s var(--ease-out) reverse forwards}
 
-.card-body {
-  padding: 14px 16px 16px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-.card-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-.card-name {
-  font-family: 'Playfair Display', serif;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text);
-  line-height: 1.25;
-}
-.card-rating {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-  background: var(--eden-50);
-  padding: 3px 8px;
-  border-radius: var(--radius-pill);
-}
-.card-rating .star { color: var(--gold-400); font-size: 12px; }
-.card-rating .num { font-size: 12px; font-weight: 700; color: var(--eden-700); }
+/* ═══ SPINNER ═══ */
+.spinner{width:20px;height:20px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block;vertical-align:middle}
+.loading-wrap{display:flex;justify-content:center;padding:60px;grid-column:1/-1}
+.big-spinner{width:40px;height:40px;border:3px solid var(--eden-100);border-top-color:var(--eden-500);border-radius:50%;animation:spin .8s linear infinite}
 
-.card-tipo {
-  font-size: 12px;
-  color: var(--subtle);
-  margin-bottom: 10px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
+/* ═══ RESPONSIVE ═══ */
+@media(max-width:960px){
+  .main{grid-template-columns:1fr}
+  .sidebar{position:static}
 }
-.card-dot { color: var(--eden-300); font-size: 10px; }
-
-.card-meta {
-  display: flex;
-  gap: 12px;
-  margin-top: auto;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
-}
-.meta-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--muted);
-}
-.meta-icon { font-size: 13px; }
-
-.card-tags {
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
-.tag {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  background: var(--eden-50);
-  color: var(--eden-700);
-  font-weight: 500;
-  border: 1px solid var(--eden-100);
-}
-
-/* List card variant */
-.rest-card-list {
-  flex-direction: row;
-}
-.rest-card-list .card-img-wrap {
-  width: 140px;
-  height: auto;
-  min-height: 120px;
-  flex-shrink: 0;
-  border-radius: 0;
-}
-.rest-card-list .card-body {
-  padding: 14px 16px;
-}
-
-/* ═══════════════════════════════════════════
-   EMPTY / NO RESULTS
-═══════════════════════════════════════════ */
-.empty-state {
-  text-align: center;
-  padding: 60px 20px;
-  grid-column: 1 / -1;
-}
-.empty-icon { font-size: 56px; margin-bottom: 16px; }
-.empty-title {
-  font-family: 'Playfair Display', serif;
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text);
-  margin-bottom: 8px;
-}
-.empty-sub { font-size: 14px; color: var(--muted); }
-
-/* ═══════════════════════════════════════════
-   PAGINATION
-═══════════════════════════════════════════ */
-.pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 6px;
-  margin-top: 32px;
-}
-.page-btn {
-  width: 38px;
-  height: 38px;
-  border-radius: var(--radius-sm);
-  border: 1.5px solid var(--border);
-  background: var(--surface);
-  font-size: 14px;
-  color: var(--muted);
-  transition: all .15s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 500;
-}
-.page-btn:hover{border-color:var(--eden-300);color:var(--eden-700);background:var(--eden-50)}
-.page-btn.active{border-color:var(--eden-700);background:var(--eden-700);color:#fff;box-shadow:0 2px 8px rgba(39,96,48,.3)}
-.page-btn:disabled{opacity:.4;cursor:not-allowed}
-
-/* ═══════════════════════════════════════════
-   MODAL
-═══════════════════════════════════════════ */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(13,32,16,.6);
-  backdrop-filter: blur(6px);
-  z-index: 500;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-.modal-overlay.open { display: flex; animation: fadeIn .2s var(--ease-out) both; }
-.modal {
-  background: var(--surface);
-  border-radius: var(--radius-xl);
-  max-width: 620px;
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: var(--shadow-xl);
-  animation: fadeUp .25s var(--ease-spring) both;
-  position: relative;
-}
-.modal-close {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1.5px solid var(--border);
-  background: var(--surface);
-  font-size: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--muted);
-  transition: all .15s;
-  z-index: 10;
-}
-.modal-close:hover{background:var(--bg);color:var(--text)}
-.modal-hero {
-  height: 220px;
-  background: linear-gradient(135deg, var(--eden-100), var(--eden-50));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 80px;
-  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-}
-.modal-body { padding: 24px; }
-.modal-name {
-  font-family: 'Playfair Display', serif;
-  font-size: 26px;
-  font-weight: 800;
-  margin-bottom: 4px;
-}
-.modal-tipo { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
-.modal-info-row {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 20px;
-  padding: 14px;
-  background: var(--bg);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-}
-.modal-info-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--muted);
-}
-.modal-section-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: .8px;
-  margin-bottom: 12px;
-  margin-top: 20px;
-}
-.menu-items {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.menu-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 14px;
-  background: var(--bg);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  gap: 12px;
-}
-.menu-item-name { font-size: 14px; font-weight: 600; }
-.menu-item-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
-.menu-item-price { font-size: 15px; font-weight: 700; color: var(--eden-600); flex-shrink: 0; }
-.btn-pedir {
-  padding: 8px 18px;
-  border-radius: var(--radius-pill);
-  border: none;
-  background: var(--eden-700);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  flex-shrink: 0;
-  transition: all .2s var(--ease-spring);
-}
-.btn-pedir:hover{background:var(--eden-600);transform:scale(1.04)}
-.btn-ver-site {
-  display: block;
-  width: 100%;
-  margin-top: 20px;
-  padding: 14px;
-  border-radius: var(--radius-lg);
-  border: none;
-  background: linear-gradient(135deg, var(--eden-700), var(--eden-500));
-  color: #fff;
-  font-size: 15px;
-  font-weight: 600;
-  text-align: center;
-  transition: all .2s var(--ease-spring);
-  box-shadow: 0 4px 16px rgba(39,96,48,.3);
-}
-.btn-ver-site:hover{box-shadow:0 8px 24px rgba(39,96,48,.4);transform:translateY(-1px)}
-
-/* ═══════════════════════════════════════════
-   SECTION - DESTAQUES MAPA
-═══════════════════════════════════════════ */
-.section-banner {
-  background: linear-gradient(135deg, var(--eden-800), var(--eden-600));
-  margin: 0 0 32px;
-  border-radius: var(--radius-xl);
-  padding: 28px 28px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  color: #fff;
-  position: relative;
-  overflow: hidden;
-  grid-column: 1 / -1;
-}
-.section-banner::before{
-  content:'🗺️';
-  position:absolute;right:-10px;top:50%;transform:translateY(-50%);
-  font-size:100px;opacity:.1;
-}
-.section-banner h3 {
-  font-family: 'Playfair Display', serif;
-  font-size: 22px;
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-.section-banner p {
-  font-size: 14px;
-  opacity: .8;
-  line-height: 1.5;
-}
-.btn-mapa {
-  flex-shrink: 0;
-  padding: 12px 24px;
-  border-radius: var(--radius-pill);
-  border: 2px solid rgba(255,255,255,.35);
-  background: rgba(255,255,255,.12);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  transition: all .2s;
-  backdrop-filter: blur(8px);
-}
-.btn-mapa:hover{background:rgba(255,255,255,.25)}
-
-/* ═══════════════════════════════════════════
-   TOAST
-═══════════════════════════════════════════ */
-.toast {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  background: var(--eden-800);
-  color: #fff;
-  padding: 12px 18px;
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  font-weight: 500;
-  box-shadow: var(--shadow-lg);
-  z-index: 900;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  animation: fadeUp .2s var(--ease-spring) both;
-  max-width: 300px;
-}
-.toast.hide{opacity:0;transition:opacity .3s;pointer-events:none}
-
-/* ═══════════════════════════════════════════
-   FOOTER
-═══════════════════════════════════════════ */
-footer {
-  background: var(--eden-900);
-  color: rgba(255,255,255,.7);
-  padding: 48px 24px 32px;
-  margin-top: 60px;
-}
-.footer-inner {
-  max-width: 1300px;
-  margin: 0 auto;
-}
-.footer-top {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr 1fr;
-  gap: 40px;
-  margin-bottom: 40px;
-}
-.footer-brand .logo-name { color: var(--eden-200); font-size: 26px; }
-.footer-brand .logo-tagline { color: var(--gold-300); margin-bottom: 14px; }
-.footer-desc {
-  font-size: 13px;
-  line-height: 1.7;
-  color: rgba(255,255,255,.5);
-  margin-top: 12px;
-  max-width: 260px;
-}
-.footer-col h5 {
-  font-size: 13px;
-  font-weight: 700;
-  color: rgba(255,255,255,.9);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 14px;
-}
-.footer-col ul {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.footer-col ul li a {
-  font-size: 13px;
-  color: rgba(255,255,255,.5);
-  transition: color .15s;
-}
-.footer-col ul li a:hover{color:var(--eden-300)}
-.footer-bottom {
-  border-top: 1px solid rgba(255,255,255,.08);
-  padding-top: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-.footer-copy { font-size: 12px; color: rgba(255,255,255,.35); }
-.footer-socials { display: flex; gap: 10px; }
-.social-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1px solid rgba(255,255,255,.12);
-  background: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  color: rgba(255,255,255,.5);
-  transition: all .2s var(--ease-spring);
-}
-.social-btn:hover{background:var(--eden-700);border-color:var(--eden-600);color:#fff;transform:translateY(-2px)}
-
-/* ═══════════════════════════════════════════
-   RESPONSIVE
-═══════════════════════════════════════════ */
-@media(max-width: 1024px) {
-  .main { grid-template-columns: 1fr; }
-  .sidebar { position: static; display: none; }
-  .footer-top { grid-template-columns: 1fr 1fr; }
-}
-@media(max-width: 640px) {
-  .header-inner { gap: 10px; }
-  .btn-entrar { display: none; }
-  .hero { padding: 40px 16px 36px; }
-  .hero-stats { gap: 24px; }
-  .main { padding: 20px 16px 40px; }
-  .cards-grid { grid-template-columns: 1fr; }
-  .footer-top { grid-template-columns: 1fr; gap: 24px; }
-  .section-banner { flex-direction: column; text-align: center; }
+@media(max-width:600px){
+  .header-inner{gap:10px}
+  .btn-cadastrar{font-size:12px;padding:8px 14px}
+  .main{padding:16px 12px 40px}
+  .cats-bar{padding:0 12px}
+  .hero{padding:48px 16px 40px}
+  .form-row{grid-template-columns:1fr}
+  .hero-stats{gap:20px}
+  .search-box input{font-size:14px}
 }
 </style>
 </head>
 <body>
 
-<!-- ══════════ HEADER ══════════ -->
+<!-- HEADER -->
 <header class="header">
   <div class="header-inner">
     <a href="#" class="logo">
@@ -1308,59 +349,38 @@ footer {
         <span class="logo-tagline">Salvando Vida</span>
       </div>
     </a>
-
     <nav class="header-tabs">
       <button class="tab-btn active" onclick="setTab(this,'restaurantes')">🍽️ Restaurantes</button>
-      <button class="tab-btn" onclick="setTab(this,'pratos')">🥗 Pratos</button>
       <button class="tab-btn" onclick="setTab(this,'mercados')">🛒 Mercados</button>
       <button class="tab-btn" onclick="setTab(this,'delivery')">🛵 Delivery</button>
-      <button class="tab-btn" onclick="setTab(this,'receitas')">📖 Receitas</button>
     </nav>
-
     <div class="header-actions">
-      <button class="btn-entrar">Entrar</button>
-      <button class="btn-cadastrar">+ Cadastrar Estabelecimento</button>
+      <div id="user-display">
+        <div class="user-avatar">🌿</div>
+        <span id="user-name-text"></span>
+        <button id="btn-logout" onclick="fazerLogout()">Sair</button>
+      </div>
+      <button class="btn-entrar" id="btn-entrar" onclick="abrirLogin()">Entrar</button>
+      <button class="btn-cadastrar" onclick="abrirCadastro()">+ Cadastrar</button>
     </div>
   </div>
 </header>
 
-<!-- ══════════ HERO ══════════ -->
+<!-- HERO -->
 <section class="hero">
-  <div class="leaf">🍃</div>
-  <div class="leaf">🌿</div>
-  <div class="leaf">🌱</div>
-  <div class="leaf">🍀</div>
-  <div class="leaf">🌾</div>
-  <div class="leaf">🪴</div>
-
+  <div class="leaf">🍃</div><div class="leaf">🌿</div>
+  <div class="leaf">🌱</div><div class="leaf">🍀</div>
   <div class="hero-content">
-    <div class="hero-badge">
-      <span class="badge-dot"></span>
-      Espírito Santo · Encontre sabor com propósito
-    </div>
-
-    <h1>
-      Comida <em>vegana</em> e saudável<br>
-      <span class="gold">perto de você</span>
-    </h1>
-    <p class="hero-sub">
-      Restaurantes, mercados e pratos 100% veganos no ES.<br>
-      Longevidade com saúde é possível — encontre aqui o melhor para sua família.
-    </p>
-
+    <div class="hero-badge"><span class="badge-dot"></span>Espírito Santo · Encontre sabor com propósito</div>
+    <h1>Comida <em>vegana</em> e saudável<br><span class="gold">perto de você</span></h1>
+    <p class="hero-sub">Restaurantes, mercados e pratos 100% veganos no ES.<br>Longevidade com saúde é possível — encontre o melhor para sua família.</p>
     <div class="search-wrap">
       <div class="search-box">
         <span class="search-icon">🔍</span>
-        <input
-          type="text"
-          id="main-search"
-          placeholder="Busque restaurante, prato, ingrediente…"
-          oninput="onSearchInput()"
-          autocomplete="off"
-        >
-        <button id="search-clear" class="search-location" onclick="clearSearch()" style="display:none">✕</button>
+        <input type="text" id="main-search" placeholder="Busque restaurante, prato, ingrediente…" oninput="onSearchInput()" autocomplete="off" aria-label="Buscar">
+        <button id="search-clear" class="search-location" onclick="clearSearch()" style="display:none" aria-label="Limpar busca">✕</button>
         <div class="search-divider"></div>
-        <select id="hero-cidade" class="search-location" style="border:none;outline:none;background:none;padding:16px;font-size:13px;color:var(--muted);cursor:pointer" onchange="filterAll()">
+        <select id="hero-cidade" style="border:none;outline:none;background:none;padding:16px 8px;font-size:13px;color:var(--muted);cursor:pointer" onchange="syncCidades('hero')" aria-label="Cidade">
           <option value="">📍 Toda ES</option>
           <option value="Vitoria">Vitória</option>
           <option value="Vila Velha">Vila Velha</option>
@@ -1371,9 +391,9 @@ footer {
           <option value="Cachoeiro">Cachoeiro de Itapemirim</option>
           <option value="Colatina">Colatina</option>
         </select>
+        <button class="btn-geo" id="btn-geo" onclick="usarGeolocalizacao()" title="Usar minha localização" aria-label="Usar geolocalização">📡</button>
         <button class="btn-buscar" onclick="filterAll()">Buscar</button>
       </div>
-
       <div class="location-row">
         <span style="font-size:12px;color:var(--muted)">Popular:</span>
         <button class="location-pill active" onclick="setCity(this,'')">Toda ES</button>
@@ -1383,64 +403,45 @@ footer {
         <button class="location-pill" onclick="setCity(this,'Serra')">📍 Serra</button>
       </div>
     </div>
-
     <div class="hero-stats">
-      <div class="stat-item">
-        <span class="stat-num" id="stat-rest">142+</span>
-        <span class="stat-label">Restaurantes</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-num">38</span>
-        <span class="stat-label">Municípios</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-num">950+</span>
-        <span class="stat-label">Pratos cadastrados</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-num">4.8★</span>
-        <span class="stat-label">Avaliação média</span>
-      </div>
+      <div class="stat-item"><span class="stat-num" id="stat-rest">—</span><span class="stat-label">Restaurantes</span></div>
+      <div class="stat-item"><span class="stat-num">8</span><span class="stat-label">Municípios</span></div>
+      <div class="stat-item"><span class="stat-num" id="stat-pratos">—</span><span class="stat-label">Pratos</span></div>
+      <div class="stat-item"><span class="stat-num">🌿</span><span class="stat-label">100% Vegano</span></div>
     </div>
   </div>
 </section>
 
-<!-- ══════════ CATEGORIAS ══════════ -->
+<!-- CATEGORIAS -->
 <div class="cats-bar">
-  <div class="cats-inner" id="cats-bar">
-    <button class="cat-pill active" onclick="setPill(this,'')"><span class="emoji">✨</span> Todos</button>
-    <button class="cat-pill" onclick="setPill(this,'vegano')"><span class="emoji">🌿</span> Vegano 100%</button>
-    <button class="cat-pill" onclick="setPill(this,'raw')"><span class="emoji">🥦</span> Crudívoro</button>
-    <button class="cat-pill" onclick="setPill(this,'japones')"><span class="emoji">🍱</span> Japonês</button>
-    <button class="cat-pill" onclick="setPill(this,'italiano')"><span class="emoji">🍝</span> Italiano</button>
-    <button class="cat-pill" onclick="setPill(this,'hamburguer')"><span class="emoji">🍔</span> Hamburguer</button>
-    <button class="cat-pill" onclick="setPill(this,'sushi')"><span class="emoji">🍣</span> Sushi Vegano</button>
-    <button class="cat-pill" onclick="setPill(this,'pizza')"><span class="emoji">🍕</span> Pizza</button>
-    <button class="cat-pill" onclick="setPill(this,'cafe')"><span class="emoji">☕</span> Café & Confeitaria</button>
-    <button class="cat-pill" onclick="setPill(this,'acai')"><span class="emoji">🫐</span> Açaí & Smoothies</button>
-    <button class="cat-pill" onclick="setPill(this,'arabe')"><span class="emoji">🧆</span> Árabe</button>
-    <button class="cat-pill" onclick="setPill(this,'sem-gluten')"><span class="emoji">🌾</span> Sem Glúten</button>
-    <button class="cat-pill" onclick="setPill(this,'fitness')"><span class="emoji">💪</span> Fitness</button>
-    <button class="cat-pill" onclick="setPill(this,'sobremesa')"><span class="emoji">🍰</span> Sobremesas</button>
-    <button class="cat-pill" onclick="setPill(this,'aberto')"><span class="emoji">🟢</span> Aberto agora</button>
+  <div class="cats-inner">
+    <button class="cat-pill active" onclick="setPill(this,'')"><span class="emoji">✨</span>Todos</button>
+    <button class="cat-pill" onclick="setPill(this,'vegano')"><span class="emoji">🌿</span>Vegano 100%</button>
+    <button class="cat-pill" onclick="setPill(this,'raw')"><span class="emoji">🥦</span>Crudívoro</button>
+    <button class="cat-pill" onclick="setPill(this,'japones')"><span class="emoji">🍱</span>Japonês</button>
+    <button class="cat-pill" onclick="setPill(this,'hamburguer')"><span class="emoji">🍔</span>Hamburguer</button>
+    <button class="cat-pill" onclick="setPill(this,'sushi')"><span class="emoji">🍣</span>Sushi Vegano</button>
+    <button class="cat-pill" onclick="setPill(this,'pizza')"><span class="emoji">🍕</span>Pizza</button>
+    <button class="cat-pill" onclick="setPill(this,'cafe')"><span class="emoji">☕</span>Café</button>
+    <button class="cat-pill" onclick="setPill(this,'acai')"><span class="emoji">🫐</span>Açaí</button>
+    <button class="cat-pill" onclick="setPill(this,'arabe')"><span class="emoji">🧆</span>Árabe</button>
+    <button class="cat-pill" onclick="setPill(this,'sem-gluten')"><span class="emoji">🌾</span>Sem Glúten</button>
+    <button class="cat-pill" onclick="setPill(this,'fitness')"><span class="emoji">💪</span>Fitness</button>
+    <button class="cat-pill" onclick="setPill(this,'sobremesa')"><span class="emoji">🍰</span>Sobremesas</button>
+    <button class="cat-pill" onclick="setPill(this,'aberto')"><span class="emoji">🟢</span>Aberto agora</button>
+    <button class="cat-pill" onclick="setPill(this,'promo')"><span class="emoji">🔥</span>Promoções</button>
   </div>
 </div>
 
-<!-- ══════════ MAIN ══════════ -->
+<!-- MAIN -->
 <div class="main">
-
   <!-- SIDEBAR -->
   <aside class="sidebar">
-
-    <!-- Localização -->
     <div class="filter-card">
-      <div class="filter-title">
-        📍 Localização
-        <button class="filter-reset-btn" onclick="resetFilters()">Limpar</button>
-      </div>
+      <div class="filter-title">📍 Localização <button class="filter-reset-btn" onclick="resetFilters()">Limpar tudo</button></div>
       <div class="filter-group">
         <span class="filter-label">Cidade</span>
-        <select class="filter-select" id="side-cidade" onchange="filterAll()">
+        <select class="filter-select" id="side-cidade" onchange="syncCidades('side')" aria-label="Filtrar por cidade">
           <option value="">Todas as cidades</option>
           <option value="Vitoria">Vitória</option>
           <option value="Vila Velha">Vila Velha</option>
@@ -1454,16 +455,15 @@ footer {
       </div>
       <div class="filter-group">
         <span class="filter-label">Bairro</span>
-        <select class="filter-select" id="side-bairro" onchange="filterAll()">
+        <select class="filter-select" id="side-bairro" onchange="filterAll()" aria-label="Filtrar por bairro">
           <option value="">Todos os bairros</option>
         </select>
       </div>
+      <div class="geo-status" id="geo-status">📡 <span id="geo-label">Localizando…</span></div>
     </div>
 
-    <!-- Filtros -->
     <div class="filter-card">
       <div class="filter-title">🎛️ Filtros</div>
-
       <div class="filter-group">
         <span class="filter-label">Faixa de preço</span>
         <div class="price-row">
@@ -1473,245 +473,488 @@ footer {
           <button class="price-btn" data-val="$$$" onclick="setPrice(this,'$$$')">$$$</button>
         </div>
       </div>
-
       <div class="filter-group">
         <span class="filter-label">Avaliação mínima</span>
-        <input type="range" class="rating-slider" min="0" max="5" step="0.5" value="0" oninput="setRating(this)">
+        <input type="range" class="rating-slider" min="0" max="5" step="0.5" value="0" oninput="setRating(this)" aria-label="Avaliação mínima">
         <div class="rating-display">⭐ <span id="rating-val">Qualquer</span></div>
       </div>
-
       <div class="filter-group">
         <span class="filter-label">Recursos</span>
         <div class="toggle-list">
           <label class="toggle-item">
-            <label>🛵 Delivery disponível</label>
-            <span class="toggle">
-              <input type="checkbox" id="tog-delivery" onchange="filterAll()">
-              <span class="toggle-track"></span>
-              <span class="toggle-thumb"></span>
-            </span>
+            <label for="tog-delivery">🛵 Delivery disponível</label>
+            <span class="toggle"><input type="checkbox" id="tog-delivery" onchange="filterAll()"><span class="toggle-track"></span><span class="toggle-thumb"></span></span>
           </label>
           <label class="toggle-item">
-            <label>🟢 Aberto agora</label>
-            <span class="toggle">
-              <input type="checkbox" id="tog-aberto" onchange="filterAll()">
-              <span class="toggle-track"></span>
-              <span class="toggle-thumb"></span>
-            </span>
+            <label for="tog-aberto">🟢 Aberto agora</label>
+            <span class="toggle"><input type="checkbox" id="tog-aberto" onchange="filterAll()"><span class="toggle-track"></span><span class="toggle-thumb"></span></span>
           </label>
           <label class="toggle-item">
-            <label>♿ Acessível</label>
-            <span class="toggle">
-              <input type="checkbox" id="tog-acessivel" onchange="filterAll()">
-              <span class="toggle-track"></span>
-              <span class="toggle-thumb"></span>
-            </span>
+            <label for="tog-acessivel">♿ Acessível</label>
+            <span class="toggle"><input type="checkbox" id="tog-acessivel" onchange="filterAll()"><span class="toggle-track"></span><span class="toggle-thumb"></span></span>
           </label>
           <label class="toggle-item">
-            <label>🌾 Sem glúten</label>
-            <span class="toggle">
-              <input type="checkbox" id="tog-gluten" onchange="filterAll()">
-              <span class="toggle-track"></span>
-              <span class="toggle-thumb"></span>
-            </span>
+            <label for="tog-gluten">🌾 Sem Glúten</label>
+            <span class="toggle"><input type="checkbox" id="tog-gluten" onchange="filterAll()"><span class="toggle-track"></span><span class="toggle-thumb"></span></span>
+          </label>
+          <label class="toggle-item">
+            <label for="tog-promo">🔥 Em promoção</label>
+            <span class="toggle"><input type="checkbox" id="tog-promo" onchange="filterAll()"><span class="toggle-track"></span><span class="toggle-thumb"></span></span>
           </label>
         </div>
       </div>
     </div>
 
-    <!-- Promo card -->
     <div class="promo-card">
-      <h4>Anuncie seu restaurante</h4>
-      <p>Alcance milhares de pessoas que buscam alimentação vegana no ES.</p>
-      <button class="btn-promo">Saiba mais →</button>
+      <h4>🌿 Cadastre seu estabelecimento</h4>
+      <p>Apareça para milhares de veganos do ES. Comece grátis!</p>
+      <button class="btn-promo" onclick="abrirCadastro()">Cadastrar agora →</button>
     </div>
-
   </aside>
 
   <!-- RESULTS -->
-  <div class="results-area">
-
-    <!-- Banner Mapa -->
-    <div class="section-banner">
-      <div>
-        <h3>Encontre no mapa</h3>
-        <p>Veja restaurantes veganos próximos a você no mapa interativo do ES</p>
-      </div>
-      <button class="btn-mapa">🗺️ Ver Mapa</button>
-    </div>
-
-    <!-- Results header -->
+  <section class="results-area" aria-live="polite" aria-label="Resultados">
     <div class="results-header">
-      <p class="results-count">Mostrando <strong id="count-label">0</strong> estabelecimentos</p>
+      <div class="results-count">Mostrando <strong id="count-label">0</strong> estabelecimentos</div>
       <div class="sort-view-row">
-        <select class="sort-select" id="sort-sel" onchange="filterAll()">
-          <option value="rating">Melhor avaliados</option>
-          <option value="nome">A → Z</option>
+        <button class="btn-mapa" onclick="abrirMapa()">🗺️ Mapa</button>
+        <select class="sort-select" id="sort-sel" onchange="filterAll()" aria-label="Ordenar por">
+          <option value="">Relevância</option>
+          <option value="rating">Melhor avaliação</option>
+          <option value="nome">Nome A–Z</option>
           <option value="novo">Mais recentes</option>
+          <option value="dist">Mais próximos</option>
           <option value="preco_asc">Menor preço</option>
         </select>
-        <div class="view-btns">
-          <button class="view-btn active" id="view-grid" onclick="setView(this,'grid')" title="Grade">⊞</button>
-          <button class="view-btn" id="view-list" onclick="setView(this,'list')" title="Lista">☰</button>
+        <div class="view-btns" role="group" aria-label="Tipo de visualização">
+          <button class="view-btn active" onclick="setView(this,'grid')" title="Grade" aria-pressed="true">⊞</button>
+          <button class="view-btn" onclick="setView(this,'list')" title="Lista" aria-pressed="false">≡</button>
         </div>
       </div>
     </div>
+    <div id="cards-container" class="cards-grid">
+      <div class="loading-wrap"><div class="big-spinner"></div></div>
+    </div>
+    <div class="pagination" id="pagination" role="navigation" aria-label="Paginação"></div>
+  </section>
+</div>
 
-    <!-- Cards container -->
-    <div id="cards-container" class="cards-grid"></div>
-
-    <!-- Pagination -->
-    <div class="pagination" id="pagination"></div>
+<!-- MAPA PANEL -->
+<div id="map-panel" role="dialog" aria-modal="true" aria-label="Mapa de restaurantes">
+  <div id="map-container-wrap">
+    <div class="map-header">
+      <div>
+        <h3>🗺️ Restaurantes no mapa</h3>
+        <div class="map-header-sub" id="map-count-label"></div>
+      </div>
+      <button class="btn-fechar" onclick="fecharMapa()" aria-label="Fechar mapa">✕</button>
+    </div>
+    <div id="leaflet-map"></div>
   </div>
 </div>
 
-<!-- ══════════ FOOTER ══════════ -->
-<footer>
-  <div class="footer-inner">
-    <div class="footer-top">
-      <div class="footer-brand">
-        <div class="logo-name">EDENA</div>
-        <div class="logo-tagline">Salvando Vida</div>
-        <p class="footer-desc">
-          O maior guia de alimentação vegana do Espírito Santo.
-          Encontre restaurantes, mercados e pratos saudáveis perto de você.
-        </p>
-      </div>
-      <div class="footer-col">
-        <h5>Explorar</h5>
-        <ul>
-          <li><a href="#">Restaurantes</a></li>
-          <li><a href="#">Pratos veganos</a></li>
-          <li><a href="#">Mercados</a></li>
-          <li><a href="#">Receitas</a></li>
-          <li><a href="#">Delivery</a></li>
-        </ul>
-      </div>
-      <div class="footer-col">
-        <h5>Empresa</h5>
-        <ul>
-          <li><a href="#">Sobre a EDENA</a></li>
-          <li><a href="#">Anuncie aqui</a></li>
-          <li><a href="#">Imprensa</a></li>
-          <li><a href="#">Parcerias</a></li>
-          <li><a href="#">Blog</a></li>
-        </ul>
-      </div>
-      <div class="footer-col">
-        <h5>Suporte</h5>
-        <ul>
-          <li><a href="#">Central de ajuda</a></li>
-          <li><a href="#">Contato</a></li>
-          <li><a href="#">Privacidade</a></li>
-          <li><a href="#">Termos de uso</a></li>
-        </ul>
-      </div>
-    </div>
-    <div class="footer-bottom">
-      <p class="footer-copy">© 2025 EDENA · Feito com 🌿 no Espírito Santo · Salvando Vida</p>
-      <div class="footer-socials">
-        <button class="social-btn" title="Instagram">📷</button>
-        <button class="social-btn" title="Facebook">📘</button>
-        <button class="social-btn" title="WhatsApp">💬</button>
-        <button class="social-btn" title="YouTube">▶️</button>
-      </div>
-    </div>
-  </div>
-</footer>
-
-<!-- ══════════ MODAL ══════════ -->
-<div class="modal-overlay" id="modal-overlay">
-  <div class="modal" id="modal">
-    <button class="modal-close" onclick="closeModal()">✕</button>
+<!-- MODAL RESTAURANTE -->
+<div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-label="Detalhes do restaurante">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal()" aria-label="Fechar">✕</button>
     <div id="modal-content"></div>
   </div>
 </div>
 
-<!-- ══════════ TOAST ══════════ -->
-<div class="toast" id="toast" style="display:none">
-  <span id="toast-msg">✓ Adicionado aos favoritos!</span>
+<!-- MODAL CADASTRO -->
+<div class="cad-overlay" id="cad-overlay" role="dialog" aria-modal="true" aria-label="Cadastrar estabelecimento">
+  <div class="cad-box">
+    <div class="cad-header">
+      <h2>🌿 Cadastrar Estabelecimento</h2>
+      <button class="btn-fechar" onclick="fecharCadastro()" aria-label="Fechar">✕</button>
+    </div>
+    <div class="cad-body">
+      <div class="form-group" style="grid-column:1/-1">
+        <label for="cad-nome">Nome do estabelecimento *</label>
+        <input type="text" id="cad-nome" placeholder="Ex: Restaurante Verde Vivo" maxlength="100">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="cad-cidade">Cidade *</label>
+          <select id="cad-cidade">
+            <option value="">Selecione...</option>
+            <option>Vitoria</option><option>Vila Velha</option><option>Cariacica</option>
+            <option>Serra</option><option>Guarapari</option><option>Linhares</option>
+            <option>Cachoeiro</option><option>Colatina</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="cad-bairro">Bairro</label>
+          <input type="text" id="cad-bairro" placeholder="Ex: Centro" maxlength="60">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="cad-tipo">Tipo / Culinária *</label>
+          <input type="text" id="cad-tipo" placeholder="Ex: Café Vegano, Pizzaria..." maxlength="80">
+        </div>
+        <div class="form-group">
+          <label for="cad-preco">Faixa de preço</label>
+          <select id="cad-preco">
+            <option value="$">$ – Econômico</option>
+            <option value="$$" selected>$$ – Moderado</option>
+            <option value="$$$">$$$ – Premium</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="cad-tel">Telefone / WhatsApp</label>
+          <input type="tel" id="cad-tel" placeholder="(27) 99999-9999" maxlength="20">
+        </div>
+        <div class="form-group">
+          <label for="cad-horario">Horário de funcionamento</label>
+          <input type="text" id="cad-horario" placeholder="Seg-Sex 11h-22h" maxlength="60">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="cad-desc">Descrição do estabelecimento</label>
+        <textarea id="cad-desc" placeholder="Conte sobre seu estabelecimento, especialidades, diferenciais..." maxlength="400"></textarea>
+      </div>
+      <div class="form-group">
+        <label for="cad-tags">Tags (separadas por vírgula)</label>
+        <input type="text" id="cad-tags" placeholder="vegano, saudável, sem-gluten, delivery" maxlength="200">
+      </div>
+      <div class="form-row" style="gap:16px">
+        <div class="checkbox-row">
+          <input type="checkbox" id="cad-delivery">
+          <label for="cad-delivery">🛵 Tem Delivery</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="cad-acessivel">
+          <label for="cad-acessivel">♿ Acessível</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="cad-gluten">
+          <label for="cad-gluten">🌾 Sem Glúten</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Foto do estabelecimento</label>
+        <div class="img-upload-zone" onclick="document.getElementById('cad-foto').click()" role="button" tabindex="0">
+          <div style="font-size:32px;margin-bottom:8px">📷</div>
+          <div style="font-size:14px;color:var(--muted)">Clique para escolher uma foto</div>
+          <div style="font-size:11px;color:var(--subtle);margin-top:4px">JPG ou PNG até 5MB</div>
+          <input type="file" id="cad-foto" accept="image/jpeg,image/png,image/webp" onchange="previewImagem(this)">
+          <img id="img-preview" alt="Preview da foto">
+        </div>
+      </div>
+      <div class="cad-info-box">
+        📍 <strong>Dica:</strong> Ative a geolocalização no botão 📡 da busca para que seu restaurante apareça no mapa com distância real para os usuários.
+      </div>
+      <button class="btn-salvar-rest" id="btn-salvar" onclick="salvarRestaurante()">🌿 Cadastrar Estabelecimento</button>
+      <div id="cad-status"></div>
+    </div>
+  </div>
 </div>
 
-<script>
-/* ═══════ DATA ═══════ */
-const RESTAURANTES = [
-  {id:1, nome:"Verde Raiz", tipo:"Restaurante Vegano", cidade:"Vitoria", bairro:"Praia do Canto", emoji:"🌿", rating:4.9, reviews:312, preco:"$$", delivery:true, aberto:true, acessivel:true, semgluten:false, novo:false, destaque:true, tags:["vegano","orgânico","sem-gluten"], descricao:"O clássico restaurante vegano de Vitória, com mais de 10 anos de tradição em alimentação saudável e consciente.", horario:"Seg-Sex 11h-15h | 18h-22h", telefone:"(27) 3222-1111", pratos:[{nome:"Prato do Dia",desc:"Arroz integral, feijão carioca, legumes grelhados",preco:"R$ 28"},{nome:"Hamburguer de Grão-de-bico",desc:"Pão artesanal, alface, tomate, molho especial",preco:"R$ 32"},{nome:"Bowl de Quinoa",desc:"Quinoa, abacate, tomate cereja, rúcula",preco:"R$ 36"}]},
-  {id:2, nome:"Raízes Café", tipo:"Café & Confeitaria Vegana", cidade:"Vitoria", bairro:"Jardim da Penha", emoji:"☕", rating:4.8, reviews:198, preco:"$", delivery:true, aberto:true, acessivel:true, semgluten:true, novo:false, destaque:false, tags:["café","confeitaria","vegano"], descricao:"Café vegano especializado em bolos, tortas e bebidas artesanais. Ambiente aconchegante.", horario:"Seg-Dom 7h-20h", telefone:"(27) 3311-4422", pratos:[{nome:"Cappuccino de Aveia",desc:"Leite de aveia artesanal",preco:"R$ 14"},{nome:"Bolo de Limão",desc:"Bolo vegano de limão siciliano com cobertura",preco:"R$ 12"},{nome:"Croissant Vegano",desc:"Massa folhada, recheio de pasta de castanha",preco:"R$ 16"}]},
-  {id:3, nome:"Sushi Zen", tipo:"Japonês Vegano", cidade:"Vila Velha", bairro:"Praia de Itaparica", emoji:"🍣", rating:4.7, reviews:276, preco:"$$$", delivery:false, aberto:true, acessivel:false, semgluten:false, novo:false, destaque:true, tags:["sushi","japonês","vegano"], descricao:"O único restaurante de sushi 100% vegano do ES. Peças criativas com ingredientes frescos.", horario:"Ter-Dom 18h-23h", telefone:"(27) 3344-5566", pratos:[{nome:"Hot Philadelphia Vegano",desc:"Cream cheese vegano, palmito, pepino",preco:"R$ 42"},{nome:"Uramaki de Manga",desc:"Manga, cenoura, abacate, gergelim",preco:"R$ 38"},{nome:"Temaki de Cogumelo",desc:"Cogumelo shiitake grelhado, arroz japonês",preco:"R$ 28"}]},
-  {id:4, nome:"Naturalíssimo", tipo:"Loja de Produtos Naturais", cidade:"Cariacica", bairro:"Campo Grande", emoji:"🛒", rating:4.6, reviews:143, preco:"$$", delivery:true, aberto:false, acessivel:true, semgluten:true, novo:false, destaque:false, tags:["mercado","produtos naturais","sem-gluten"], descricao:"Maior loja de produtos naturais e veganos de Cariacica. Delivery para toda região metropolitana.", horario:"Seg-Sab 8h-19h", telefone:"(27) 3355-7788", pratos:[{nome:"Granola Artesanal",desc:"500g, sem açúcar refinado",preco:"R$ 22"},{nome:"Proteína de Soja",desc:"Pacote 1kg, temperada",preco:"R$ 18"},{nome:"Leite de Amêndoas",desc:"1L, sem conservantes",preco:"R$ 16"}]},
-  {id:5, nome:"Burguer Eden", tipo:"Hamburgueria Vegana", cidade:"Serra", bairro:"Serra Dourada", emoji:"🍔", rating:4.8, reviews:387, preco:"$$", delivery:true, aberto:true, acessivel:true, semgluten:false, novo:true, destaque:true, tags:["hamburguer","vegano","delivery"], descricao:"Hamburgueria vegana artesanal com os melhores smash burgers de grão-de-bico e jaca do ES.", horario:"Seg-Dom 11h-23h", telefone:"(27) 3366-9900", pratos:[{nome:"Smash Burger Classic",desc:"Blend de grão-de-bico, cheddar vegano, picles",preco:"R$ 38"},{nome:"BBQ Jackfruit",desc:"Jaca desfiada, molho barbecue, cebola caramelizada",preco:"R$ 42"},{nome:"Combo Duplo",desc:"2 burgers + batata frita + bebida",preco:"R$ 68"}]},
-  {id:6, nome:"Pizza Sagrada", tipo:"Pizzaria Vegana", cidade:"Vitoria", bairro:"Santa Lúcia", emoji:"🍕", rating:4.7, reviews:224, preco:"$$", delivery:true, aberto:false, acessivel:true, semgluten:true, novo:false, destaque:false, tags:["pizza","vegana","sem-gluten"], descricao:"Pizzas artesanais veganas com massa integral ou sem glúten. Ingredientes orgânicos.", horario:"Sex-Dom 18h-23h | Qua-Qui 18h-22h", telefone:"(27) 3377-1122", pratos:[{nome:"Margherita Vegana",desc:"Molho de tomate, queijo de castanha, manjericão",preco:"R$ 48"},{nome:"Cogumelos & Espinafre",desc:"Mix de cogumelos, espinafre, alho negro",preco:"R$ 54"},{nome:"Tropical",desc:"Jaca, palmito, pimentão, tomate cereja",preco:"R$ 52"}]},
-  {id:7, nome:"AçaíVerde", tipo:"Açaí & Smoothies", cidade:"Guarapari", bairro:"Centro", emoji:"🫐", rating:4.5, reviews:167, preco:"$", delivery:true, aberto:true, acessivel:false, semgluten:true, novo:true, destaque:false, tags:["açaí","smoothies","fitness"], descricao:"Açaí nativo do Pará sem aditivos, smoothies funcionais e bowls para quem cuida da saúde.", horario:"Seg-Dom 9h-21h", telefone:"(28) 3261-4455", pratos:[{nome:"Bowl Classic",desc:"Açaí, granola, banana, mel de caju",preco:"R$ 22"},{nome:"Green Smoothie",desc:"Espinafre, maçã verde, gengibre, limão",preco:"R$ 18"},{nome:"Açaí Proteico",desc:"Açaí + proteína de arroz + frutas vermelhas",preco:"R$ 28"}]},
-  {id:8, nome:"Templo da Saúde", tipo:"Restaurante por Kg Vegano", cidade:"Vitoria", bairro:"Centro", emoji:"🥗", rating:4.6, reviews:289, preco:"$", delivery:false, aberto:true, acessivel:true, semgluten:false, novo:false, destaque:false, tags:["por-quilo","vegano","almoço"], descricao:"Tradicional restaurante por quilo 100% vegano no coração de Vitória. Buffet renovado diariamente.", horario:"Seg-Sex 11h-15h", telefone:"(27) 3221-3344", pratos:[{nome:"Buffet Vegano (por 100g)",desc:"Variedade diária de pratos quentes e frios",preco:"R$ 5,90"},{nome:"Suco Natural",desc:"Diversas opções de suco fresco",preco:"R$ 8"},{nome:"Sobremesa do Dia",desc:"Docinho ou bolo vegano",preco:"R$ 6"}]},
-  {id:9, nome:"Falafel & Co", tipo:"Árabe Vegano", cidade:"Vila Velha", bairro:"Centro", emoji:"🧆", rating:4.8, reviews:156, preco:"$$", delivery:true, aberto:true, acessivel:true, semgluten:false, novo:true, destaque:true, tags:["árabe","falafel","vegano"], descricao:"Autêntico falafel vegano com receita do Líbano adaptada com ingredientes locais.", horario:"Ter-Dom 11h-22h", telefone:"(27) 3388-6677", pratos:[{nome:"Wrap de Falafel",desc:"Falafel, tahini, salada, molho de iogurte vegano",preco:"R$ 30"},{nome:"Hummus Artesanal",desc:"Grão-de-bico, tahini, limão, azeite, 250g",preco:"R$ 24"},{nome:"Mezze Vegano",desc:"Falafel + hummus + pão sírio + salada",preco:"R$ 48"}]},
-  {id:10, nome:"Longevidade Café", tipo:"Café Funcional", cidade:"Serra", bairro:"Laranjeiras", emoji:"🌱", rating:4.9, reviews:98, preco:"$$", delivery:false, aberto:true, acessivel:true, semgluten:true, novo:true, destaque:true, tags:["café","funcional","fitness","sem-gluten"], descricao:"Café focado em longevidade com alimentos funcionais e adaptógenos. Inspirado nas zonas azuis.", horario:"Seg-Sab 7h-18h", telefone:"(27) 3399-0011", pratos:[{nome:"Golden Latte",desc:"Leite de coco, cúrcuma, gengibre, pimenta preta",preco:"R$ 18"},{nome:"Salada Longevidade",desc:"Folhas, grãos, sementes, vinagrete de limão",preco:"R$ 32"},{nome:"Tigela Azul",desc:"Espirulina, frutas, granola funcional, mel",preco:"R$ 26"}]},
-  {id:11, nome:"Doce Natureza", tipo:"Confeitaria & Sorveteria Vegana", cidade:"Cariacica", bairro:"Itacibá", emoji:"🍰", rating:4.5, reviews:211, preco:"$$", delivery:true, aberto:false, acessivel:false, semgluten:false, novo:false, destaque:false, tags:["sobremesa","sorvete","confeitaria","vegano"], descricao:"Confeitaria vegana especializada em bolos sob encomenda, tortas e sorvetes artesanais.", horario:"Ter-Dom 10h-20h", telefone:"(27) 3344-2233", pratos:[{nome:"Sorvete de Coco",desc:"Cremoso, sem lactose, zero aditivos",preco:"R$ 12"},{nome:"Bolo de Chocolate Vegano",desc:"Fatia generosa com ganache de cacau",preco:"R$ 14"},{nome:"Torta de Morango",desc:"Massa de castanha, creme de caju, morangos",preco:"R$ 18"}]},
-  {id:12, nome:"Nordeste Vegano", tipo:"Culinária Nordestina Vegana", cidade:"Linhares", bairro:"Bebedouro", emoji:"🌵", rating:4.7, reviews:134, preco:"$$", delivery:false, aberto:true, acessivel:true, semgluten:false, novo:false, destaque:false, tags:["nordestino","vegano","regional"], descricao:"Sabores do nordeste reinventados de forma 100% vegana. Baião de dois vegano, buchada de jaca e muito mais.", horario:"Seg-Sab 11h-15h | Sex-Sab 18h-22h", telefone:"(27) 3264-5544", pratos:[{nome:"Baião de Dois Vegano",desc:"Arroz, feijão verde, coentro, queijo de castanha",preco:"R$ 32"},{nome:"Buchada de Jaca",desc:"Jaca desfiada, temperos nordestinos, beiju",preco:"R$ 28"},{nome:"Mocotó de Banana",desc:"Banana verde cozida, legumes, especiarias",preco:"R$ 24"}]},
+<!-- LOGIN MODAL -->
+<div class="login-overlay" id="login-overlay" role="dialog" aria-modal="true" aria-label="Entrar">
+  <div class="login-box">
+    <div class="login-header">
+      <h2>🌿 Entrar no EDENA</h2>
+      <button class="btn-fechar" onclick="fecharLogin()" aria-label="Fechar">✕</button>
+    </div>
+    <div class="login-body">
+      <button class="btn-google" onclick="loginGoogle()">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        Continuar com Google
+      </button>
+      <div class="login-divider">ou entre com e-mail</div>
+      <div class="form-group">
+        <label for="login-email">E-mail</label>
+        <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label for="login-senha">Senha</label>
+        <input type="password" id="login-senha" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')loginEmail()">
+      </div>
+      <button class="btn-email-login" onclick="loginEmail()">Entrar / Criar conta</button>
+      <div class="login-switch">Novo por aqui? Basta digitar e-mail + senha para <button onclick="void(0)">criar sua conta</button> grátis.</div>
+      <div id="login-error" role="alert"></div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" role="status" aria-live="polite"><span id="toast-msg"></span></div>
+
+<!-- ══════════ Leaflet (carregado antes do módulo JS) ══════════ -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- ══════════ Firebase + App Logic (único módulo) ══════════ -->
+<script type="module">
+import { initializeApp }          from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
+import { getFirestore, collection, getDocs, addDoc, query, orderBy, serverTimestamp }
+                                   from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+import { getStorage, ref as sRef, uploadBytes, getDownloadURL }
+                                   from "https://www.gstatic.com/firebasejs/11.1.0/firebase-storage.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider,
+         createUserWithEmailAndPassword, signInWithEmailAndPassword,
+         signOut, onAuthStateChanged }
+                                   from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+
+/* ── CONFIG ── */
+const FB = initializeApp({
+  apiKey:            "AIzaSyAcRZch-DZrHtOZaEBl735iwnFp4Yf4N78",
+  authDomain:        "vegmap-21101.firebaseapp.com",
+  projectId:         "vegmap-21101",
+  storageBucket:     "vegmap-21101.firebasestorage.app",
+  messagingSenderId: "615815897277",
+  appId:             "1:615815897277:web:a58e2d6e4aa798565657d4"
+});
+const db      = getFirestore(FB);
+const storage = getStorage(FB);
+const auth    = getAuth(FB);
+const gp      = new GoogleAuthProvider();
+
+/* ── SEED DATA (fallback enquanto Firestore está vazio) ── */
+const SEED = [
+  {id:'s1',  nome:"Verde Vivo",          tipo:"Restaurante Vegano",           cidade:"Vitoria",    bairro:"Praia do Canto",    emoji:"🌿", rating:4.9, reviews:312, preco:"$$",  delivery:true,  aberto:true,  acessivel:true,  semgluten:false, novo:false, destaque:true,  promo:false, tags:["vegano","por-quilo","almoço"],              descricao:"O restaurante vegano mais premiado de Vitória.",           horario:"Seg-Sex 11h-15h | Sex-Dom 18h-22h", telefone:"(27) 3344-1234", lat:-20.273, lng:-40.297, pratos:[{nome:"Feijoada Vegana",        desc:"Grãos, proteína vegetal, couve",preco:"R$ 38"},{nome:"Prato Executivo",      desc:"Arroz integral + proteína + 3 saladas",preco:"R$ 32"}]},
+  {id:'s2',  nome:"Raízes Café",          tipo:"Café & Confeitaria Vegana",    cidade:"Vitoria",    bairro:"Jardim da Penha",   emoji:"☕", rating:4.8, reviews:198, preco:"$",   delivery:true,  aberto:true,  acessivel:true,  semgluten:true,  novo:false, destaque:false, promo:true,  tags:["café","confeitaria","vegano","sem-gluten"],  descricao:"Café vegano especializado em bolos e bebidas artesanais.", horario:"Seg-Dom 7h-20h",             telefone:"(27) 3311-4422", lat:-20.261, lng:-40.289, pratos:[{nome:"Cappuccino de Aveia",     desc:"Leite de aveia artesanal",     preco:"R$ 14"},{nome:"Bolo de Limão",        desc:"Bolo vegano com cobertura",    preco:"R$ 12"}]},
+  {id:'s3',  nome:"Sushi Zen",            tipo:"Japonês Vegano",               cidade:"Vila Velha", bairro:"Praia de Itaparica",emoji:"🍣", rating:4.7, reviews:276, preco:"$$$", delivery:false, aberto:true,  acessivel:false, semgluten:false, novo:false, destaque:true,  promo:false, tags:["sushi","japonês","vegano"],                  descricao:"O único restaurante de sushi 100% vegano do ES.",         horario:"Ter-Dom 18h-23h",            telefone:"(27) 3344-5566", lat:-20.339, lng:-40.292, pratos:[{nome:"Hot Philadelphia Vegano",desc:"Cream cheese vegano, palmito",  preco:"R$ 42"}]},
+  {id:'s4',  nome:"Naturalíssimo",        tipo:"Loja de Produtos Naturais",    cidade:"Cariacica",  bairro:"Campo Grande",      emoji:"🛒", rating:4.6, reviews:143, preco:"$$",  delivery:true,  aberto:false, acessivel:true,  semgluten:true,  novo:false, destaque:false, promo:true,  tags:["mercado","produtos naturais","sem-gluten"],  descricao:"Maior loja de produtos naturais de Cariacica.",           horario:"Seg-Sab 8h-19h",             telefone:"(27) 3355-7788", lat:-20.262, lng:-40.416, pratos:[{nome:"Granola Artesanal",      desc:"500g, sem açúcar refinado",    preco:"R$ 22"}]},
+  {id:'s5',  nome:"Burguer Eden",         tipo:"Hamburgueria Vegana",          cidade:"Serra",      bairro:"Serra Dourada",     emoji:"🍔", rating:4.8, reviews:387, preco:"$$",  delivery:true,  aberto:true,  acessivel:true,  semgluten:false, novo:true,  destaque:true,  promo:false, tags:["hamburguer","vegano","delivery"],             descricao:"Smash burgers artesanais de grão-de-bico e jaca.",        horario:"Seg-Dom 11h-23h",            telefone:"(27) 3366-9900", lat:-20.128, lng:-40.310, pratos:[{nome:"Smash Burger Classic",  desc:"Blend de grão-de-bico, cheddar vegano",preco:"R$ 38"}]},
+  {id:'s6',  nome:"Pizza Sagrada",        tipo:"Pizzaria Vegana",              cidade:"Vitoria",    bairro:"Santa Lúcia",       emoji:"🍕", rating:4.7, reviews:224, preco:"$$",  delivery:true,  aberto:false, acessivel:true,  semgluten:true,  novo:false, destaque:false, promo:false, tags:["pizza","vegana","sem-gluten"],               descricao:"Pizzas artesanais veganas com massa integral ou sem glúten.",horario:"Sex-Dom 18h-23h",           telefone:"(27) 3377-1122", lat:-20.284, lng:-40.314, pratos:[{nome:"Margherita Vegana",     desc:"Queijo de castanha, manjericão",preco:"R$ 48"}]},
+  {id:'s7',  nome:"AçaíVerde",            tipo:"Açaí & Smoothies",             cidade:"Guarapari",  bairro:"Centro",            emoji:"🫐", rating:4.5, reviews:167, preco:"$",   delivery:true,  aberto:true,  acessivel:false, semgluten:true,  novo:true,  destaque:false, promo:true,  tags:["açaí","smoothies","fitness","sem-gluten"],   descricao:"Açaí nativo do Pará sem aditivos e bowls funcionais.",    horario:"Seg-Dom 9h-21h",             telefone:"(28) 3261-4455", lat:-20.674, lng:-40.504, pratos:[{nome:"Bowl Classic",           desc:"Açaí, granola, banana",        preco:"R$ 22"}]},
+  {id:'s8',  nome:"Falafel & Co",         tipo:"Árabe Vegano",                 cidade:"Vila Velha", bairro:"Centro",            emoji:"🧆", rating:4.8, reviews:156, preco:"$$",  delivery:true,  aberto:true,  acessivel:true,  semgluten:false, novo:true,  destaque:true,  promo:false, tags:["árabe","falafel","vegano"],                  descricao:"Autêntico falafel vegano com receita do Líbano.",         horario:"Ter-Dom 11h-22h",            telefone:"(27) 3388-6677", lat:-20.329, lng:-40.296, pratos:[{nome:"Wrap de Falafel",       desc:"Falafel, tahini, salada",      preco:"R$ 30"}]},
+  {id:'s9',  nome:"Longevidade Café",     tipo:"Café Funcional",               cidade:"Serra",      bairro:"Laranjeiras",       emoji:"🌱", rating:4.9, reviews:98,  preco:"$$",  delivery:false, aberto:true,  acessivel:true,  semgluten:true,  novo:true,  destaque:true,  promo:false, tags:["café","funcional","fitness","sem-gluten"],   descricao:"Café focado em longevidade com alimentos funcionais.",    horario:"Seg-Sab 7h-18h",             telefone:"(27) 3399-0011", lat:-20.152, lng:-40.299, pratos:[{nome:"Golden Latte",          desc:"Leite de coco, cúrcuma, gengibre",preco:"R$ 18"}]},
+  {id:'s10', nome:"Doce Natureza",        tipo:"Confeitaria Vegana",           cidade:"Cariacica",  bairro:"Itacibá",           emoji:"🍰", rating:4.5, reviews:211, preco:"$$",  delivery:true,  aberto:false, acessivel:false, semgluten:false, novo:false, destaque:false, promo:true,  tags:["sobremesa","sorvete","confeitaria","vegano"], descricao:"Confeitaria vegana especializada em bolos e sorvetes.",  horario:"Ter-Dom 10h-20h",            telefone:"(27) 3344-2233", lat:-20.271, lng:-40.401, pratos:[{nome:"Sorvete de Coco",       desc:"Cremoso, sem lactose",         preco:"R$ 12"}]},
+  {id:'s11', nome:"Nordeste Vegano",      tipo:"Culinária Nordestina Vegana",  cidade:"Linhares",   bairro:"Bebedouro",         emoji:"🌵", rating:4.7, reviews:134, preco:"$$",  delivery:false, aberto:true,  acessivel:true,  semgluten:false, novo:false, destaque:false, promo:false, tags:["nordestino","vegano","regional"],             descricao:"Sabores do nordeste reinventados de forma 100% vegana.", horario:"Seg-Sab 11h-15h",            telefone:"(27) 3264-5544", lat:-19.390, lng:-40.068, pratos:[{nome:"Baião de Dois Vegano",  desc:"Arroz, feijão verde, coentro", preco:"R$ 32"}]},
+  {id:'s12', nome:"Templo da Saúde",      tipo:"Restaurante por Kg Vegano",    cidade:"Vitoria",    bairro:"Centro",            emoji:"🥗", rating:4.6, reviews:289, preco:"$",   delivery:false, aberto:true,  acessivel:true,  semgluten:false, novo:false, destaque:false, promo:false, tags:["por-quilo","vegano","almoço"],               descricao:"Tradicional restaurante por quilo 100% vegano.",         horario:"Seg-Sex 11h-15h",            telefone:"(27) 3221-3344", lat:-20.319, lng:-40.338, pratos:[{nome:"Buffet Vegano (100g)",  desc:"Variedade diária",             preco:"R$ 5,90"}]},
 ];
 
-/* ═══════ STATE ═══════ */
-let currentPill = '';
-let currentTab = 'restaurantes';
-let priceFilter = '';
-let ratingFilter = 0;
-let currentView = 'grid';
-let currentPage = 1;
-const PER_PAGE = 9;
-let favorites = new Set();
-let searchDebounce;
+/* ── STATE ── */
+let RESTAURANTES = [];
+let currentPill  = '', currentTab = 'restaurantes', priceFilter = '', ratingFilter = 0;
+let currentView  = 'grid', currentPage = 1;
+const PER_PAGE   = 9;
+let favorites    = new Set(JSON.parse(localStorage.getItem('edena_favs') || '[]'));
+let searchDebounce, userLat = null, userLng = null;
+let leafletMap   = null, leafletMarkers = [];
 
-/* ═══════ FILTER ═══════ */
-function filterAll() {
-  const q = document.getElementById('main-search').value.toLowerCase().trim();
-  const cidade = document.getElementById('side-cidade').value || document.getElementById('hero-cidade').value;
-  const bairro = document.getElementById('side-bairro').value;
-  const delivery = document.getElementById('tog-delivery').checked;
-  const aberto = document.getElementById('tog-aberto').checked;
-  const acessivel = document.getElementById('tog-acessivel').checked;
-  const semgluten = document.getElementById('tog-gluten').checked;
-  const sort = document.getElementById('sort-sel').value;
+/* ── UTILS ── */
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = String(s ?? '');
+  return d.innerHTML;
+}
+function haversine(la1,ln1,la2,ln2){
+  const R=6371, dL=(la2-la1)*Math.PI/180, dN=(ln2-ln1)*Math.PI/180;
+  const a=Math.sin(dL/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dN/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function cssVar(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
 
-  let filtered = RESTAURANTES.filter(r => {
-    if (q && !r.nome.toLowerCase().includes(q) && !r.tipo.toLowerCase().includes(q) && !r.tags.some(t => t.includes(q))) return false;
+/* ── FIRESTORE LOAD ── */
+async function carregarRestaurantes() {
+  try {
+    const snap = await getDocs(query(collection(db,'restaurantes'), orderBy('criadoEm','desc')));
+    const remote = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Mantém seed + adiciona novos do Firestore que não estejam no seed
+    const seedIds = new Set(SEED.map(s => s.id));
+    const novos   = remote.filter(r => !seedIds.has(r.id));
+    RESTAURANTES  = [...SEED, ...novos];
+  } catch(e) {
+    console.warn('Firestore indisponível, usando dados locais:', e.message);
+    RESTAURANTES = [...SEED];
+  }
+  atualizarStats();
+  filterAll();
+}
+
+function atualizarStats(){
+  document.getElementById('stat-rest').textContent   = RESTAURANTES.length + '+';
+  const tp = RESTAURANTES.reduce((a,r)=>(a+(r.pratos?.length||0)),0);
+  document.getElementById('stat-pratos').textContent = tp + '+';
+}
+
+/* ── AUTH ── */
+onAuthStateChanged(auth, user => {
+  const ud = document.getElementById('user-display');
+  const be = document.getElementById('btn-entrar');
+  if (user) {
+    ud.style.display = 'flex';
+    document.getElementById('user-name-text').textContent =
+      (user.displayName || user.email || '').split(' ')[0];
+    be.style.display = 'none';
+  } else {
+    ud.style.display = 'none';
+    be.style.display = '';
+  }
+});
+
+window.abrirLogin  = () => { document.getElementById('login-overlay').classList.add('open'); document.body.style.overflow='hidden'; };
+window.fecharLogin = () => { document.getElementById('login-overlay').classList.remove('open'); document.body.style.overflow=''; };
+
+window.loginGoogle = async () => {
+  document.getElementById('login-error').textContent = '';
+  try {
+    await signInWithPopup(auth, gp);
+    fecharLogin();
+    showToast('✅ Login realizado com sucesso!');
+  } catch(e) {
+    document.getElementById('login-error').textContent = 'Erro no login com Google. Tente novamente.';
+  }
+};
+
+window.loginEmail = async () => {
+  const email = document.getElementById('login-email').value.trim();
+  const senha  = document.getElementById('login-senha').value;
+  const errEl  = document.getElementById('login-error');
+  errEl.textContent = '';
+  if (!email || !senha) { errEl.textContent = 'Preencha e-mail e senha.'; return; }
+  if (senha.length < 6)  { errEl.textContent = 'Senha deve ter ao menos 6 caracteres.'; return; }
+  try {
+    await signInWithEmailAndPassword(auth, email, senha);
+    fecharLogin();
+    showToast('✅ Login realizado!');
+  } catch {
+    try {
+      await createUserWithEmailAndPassword(auth, email, senha);
+      fecharLogin();
+      showToast('🎉 Conta criada! Bem-vindo ao EDENA 🌿');
+    } catch(e2) {
+      errEl.textContent = e2.code === 'auth/email-already-in-use'
+        ? 'E-mail já cadastrado. Verifique sua senha.'
+        : 'Erro ao autenticar. Tente novamente.';
+    }
+  }
+};
+
+window.fazerLogout = async () => {
+  await signOut(auth);
+  showToast('👋 Até logo!');
+};
+
+/* ── GEOLOCALIZAÇÃO ── */
+window.usarGeolocalizacao = () => {
+  if (!navigator.geolocation) { showToast('⚠️ Geolocalização não suportada neste navegador.'); return; }
+  const btn = document.getElementById('btn-geo');
+  btn.classList.add('loading');
+  btn.disabled = true;
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      userLat = pos.coords.latitude;
+      userLng = pos.coords.longitude;
+      btn.classList.remove('loading');
+      btn.disabled = false;
+      const gs = document.getElementById('geo-status');
+      gs.classList.add('visible');
+      document.getElementById('geo-label').textContent =
+        `Lat ${userLat.toFixed(4)}, Lng ${userLng.toFixed(4)}`;
+      document.getElementById('sort-sel').value = 'dist';
+      showToast('✅ Localização obtida! Ordenando por distância…');
+      filterAll();
+    },
+    () => {
+      btn.classList.remove('loading');
+      btn.disabled = false;
+      showToast('⚠️ Não foi possível obter localização. Verifique as permissões do navegador.');
+    },
+    { timeout: 10000 }
+  );
+};
+
+/* ── SINCRONIZA SELECTS DE CIDADE ── */
+window.syncCidades = source => {
+  const val = document.getElementById(source === 'hero' ? 'hero-cidade' : 'side-cidade').value;
+  document.getElementById('hero-cidade').value = val;
+  document.getElementById('side-cidade').value = val;
+  currentPage = 1;
+  filterAll();
+};
+
+/* ── FILTRO PRINCIPAL ── */
+window.filterAll = function() {
+  const q       = document.getElementById('main-search').value.toLowerCase().trim();
+  const cidade  = document.getElementById('hero-cidade').value;
+  const bairro  = document.getElementById('side-bairro').value;
+  const deliv   = document.getElementById('tog-delivery').checked;
+  const aberto  = document.getElementById('tog-aberto').checked;
+  const acess   = document.getElementById('tog-acessivel').checked;
+  const gluten  = document.getElementById('tog-gluten').checked;
+  const promo   = document.getElementById('tog-promo').checked;
+  const sort    = document.getElementById('sort-sel').value;
+
+  // Atualiza bairros dinamicamente
+  if (cidade) {
+    const bairros = [...new Set(RESTAURANTES.filter(r => r.cidade===cidade && r.bairro).map(r => r.bairro))].sort();
+    const sel = document.getElementById('side-bairro');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Todos os bairros</option>' +
+      bairros.map(b => `<option${b===cur?' selected':''}>${esc(b)}</option>`).join('');
+  }
+
+  let list = RESTAURANTES.filter(r => {
+    if (q && !r.nome.toLowerCase().includes(q) &&
+              !r.tipo.toLowerCase().includes(q) &&
+              !(r.tags||[]).some(t => t.includes(q))) return false;
     if (cidade && r.cidade !== cidade) return false;
     if (bairro && r.bairro !== bairro) return false;
     if (currentPill === 'aberto' && !r.aberto) return false;
-    if (currentPill && currentPill !== 'aberto' && !r.tags.includes(currentPill) && !r.tipo.toLowerCase().includes(currentPill)) return false;
+    if (currentPill === 'promo'  && !r.promo)  return false;
+    if (currentPill && !['aberto','promo',''].includes(currentPill) &&
+        !(r.tags||[]).includes(currentPill) &&
+        !r.tipo.toLowerCase().includes(currentPill)) return false;
+    if (currentTab === 'delivery' && !r.delivery) return false;
+    if (currentTab === 'mercados' &&
+        !r.tipo.toLowerCase().includes('mercado') &&
+        !r.tipo.toLowerCase().includes('loja')) return false;
     if (priceFilter && r.preco !== priceFilter) return false;
     if (ratingFilter > 0 && r.rating < ratingFilter) return false;
-    if (delivery && !r.delivery) return false;
-    if (aberto && !r.aberto) return false;
-    if (acessivel && !r.acessivel) return false;
-    if (semgluten && !r.semgluten) return false;
+    if (deliv   && !r.delivery)  return false;
+    if (aberto  && !r.aberto)    return false;
+    if (acess   && !r.acessivel) return false;
+    if (gluten  && !r.semgluten) return false;
+    if (promo   && !r.promo)     return false;
     return true;
   });
 
-  // Sort
-  filtered.sort((a,b) => {
-    if (sort === 'rating') return b.rating - a.rating;
-    if (sort === 'nome') return a.nome.localeCompare(b.nome);
-    if (sort === 'novo') return (b.novo?1:0) - (a.novo?1:0);
+  // Calcula distância se disponível
+  if (userLat !== null) {
+    list = list.map(r => ({
+      ...r,
+      _dist: (r.lat && r.lng) ? haversine(userLat, userLng, r.lat, r.lng) : null
+    }));
+  }
+
+  list.sort((a,b) => {
+    if (sort === 'rating')    return b.rating - a.rating;
+    if (sort === 'nome')      return a.nome.localeCompare(b.nome, 'pt-BR');
+    if (sort === 'novo')      return (b.novo?1:0) - (a.novo?1:0);
     if (sort === 'preco_asc') return a.preco.length - b.preco.length;
-    return 0;
+    if (sort === 'dist' && userLat !== null)
+      return (a._dist ?? Infinity) - (b._dist ?? Infinity);
+    // Padrão: destaque primeiro, depois rating
+    if (a.destaque !== b.destaque) return (b.destaque?1:0) - (a.destaque?1:0);
+    return b.rating - a.rating;
   });
 
-  document.getElementById('count-label').textContent = filtered.length;
+  document.getElementById('count-label').textContent = list.length;
 
-  // Paginate
-  const total = filtered.length;
-  const totalPages = Math.ceil(total / PER_PAGE);
-  const start = (currentPage - 1) * PER_PAGE;
-  const paginated = filtered.slice(start, start + PER_PAGE);
-
-  renderCards(paginated);
+  const totalPages = Math.ceil(list.length / PER_PAGE);
+  if (currentPage > totalPages && totalPages > 0) currentPage = 1;
+  renderCards(list.slice((currentPage-1)*PER_PAGE, currentPage*PER_PAGE));
   renderPagination(totalPages);
-}
+};
 
+/* ── RENDER CARDS ── */
 function renderCards(list) {
   const cont = document.getElementById('cards-container');
   cont.className = currentView === 'grid' ? 'cards-grid' : 'cards-list';
 
-  if (list.length === 0) {
+  if (!list.length) {
     cont.innerHTML = `<div class="empty-state">
       <div class="empty-icon">🌱</div>
       <div class="empty-title">Nenhum resultado encontrado</div>
@@ -1721,250 +964,364 @@ function renderCards(list) {
   }
 
   cont.innerHTML = list.map((r, i) => {
-    const isFav = favorites.has(r.id);
-    const delay = (i % PER_PAGE) * 0.05;
-    const listClass = currentView === 'list' ? ' rest-card-list' : '';
+    const isFav    = favorites.has(r.id);
+    const delay    = (i % PER_PAGE) * 0.05;
+    const listCls  = currentView === 'list' ? ' rest-card-list' : '';
+    const distBadge = (r._dist != null)
+      ? `<span class="card-dist">📍 ${r._dist.toFixed(1)} km</span>` : '';
+    const fotoEl   = r.fotoUrl
+      ? `<img class="card-photo" src="${esc(r.fotoUrl)}" alt="${esc(r.nome)}" loading="lazy">` : '';
     return `
-    <div class="rest-card${listClass}" style="animation-delay:${delay}s" data-id="${r.id}">
+    <div class="rest-card${listCls}" style="animation-delay:${delay}s" data-id="${esc(r.id)}" role="button" tabindex="0" aria-label="${esc(r.nome)}">
       <div class="card-img-wrap">
-        <div class="card-img-inner">${esc(r.emoji)}</div>
+        <div class="card-img-inner" aria-hidden="true">${esc(r.emoji||'🌿')}</div>
+        ${fotoEl}
         <div class="card-badges">
           ${r.destaque ? '<span class="badge badge-destaque">⭐ Destaque</span>' : ''}
-          ${r.novo ? '<span class="badge badge-novo">✨ Novo</span>' : ''}
-          ${r.delivery ? '<span class="badge badge-delivery">🛵 Delivery</span>' : ''}
+          ${r.novo     ? '<span class="badge badge-novo">✨ Novo</span>'        : ''}
+          ${r.delivery ? '<span class="badge badge-delivery">🛵 Delivery</span>': ''}
+          ${r.promo    ? '<span class="badge badge-promo">🔥 Promoção</span>'   : ''}
         </div>
-        <button class="card-fav ${isFav?'active':''}" data-fav="${r.id}">${isFav?'❤️':'🤍'}</button>
+        <button class="card-fav ${isFav?'active':''}" data-fav="${esc(r.id)}"
+          aria-label="${isFav?'Remover dos':'Adicionar aos'} favoritos" aria-pressed="${isFav}">
+          ${isFav?'❤️':'🤍'}
+        </button>
       </div>
       <div class="card-body">
         <div class="card-top">
           <div class="card-name">${esc(r.nome)}</div>
-          <div class="card-rating">
-            <span class="star">★</span>
-            <span class="num">${esc(r.rating)}</span>
-          </div>
+          ${r.rating ? `<div class="card-rating"><span class="star" aria-hidden="true">★</span><span class="num">${esc(r.rating)}</span></div>` : ''}
         </div>
         <div class="card-tipo">
-          ${esc(r.tipo)} <span class="card-dot">•</span> ${esc(r.cidade)}
+          ${esc(r.tipo)} <span class="card-dot">•</span> ${esc(r.cidade)}${distBadge}
         </div>
-        <div class="card-tags">
-          ${r.tags.slice(0,3).map(t => `<span class="tag">${esc(t)}</span>`).join('')}
-        </div>
+        <div class="card-tags">${(r.tags||[]).slice(0,3).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
         <div class="card-meta">
-          <div class="meta-item"><span class="meta-icon">💰</span> ${esc(r.preco)}</div>
-          <div class="meta-item"><span class="meta-icon">${r.aberto?'🟢':'🔴'}</span> ${r.aberto?'Aberto':'Fechado'}</div>
-          <div class="meta-item"><span class="meta-icon">⭐</span> ${esc(r.reviews)} avaliações</div>
+          <div class="meta-item"><span class="meta-icon" aria-hidden="true">💰</span>${esc(r.preco)}</div>
+          <div class="meta-item"><span class="meta-icon" aria-hidden="true">${r.aberto?'🟢':'🔴'}</span>${r.aberto?'Aberto':'Fechado'}</div>
+          ${r.reviews ? `<div class="meta-item"><span class="meta-icon" aria-hidden="true">⭐</span>${esc(r.reviews)} aval.</div>` : ''}
         </div>
       </div>
     </div>`;
   }).join('');
 
-  // Attach events via delegation after rendering
   cont.querySelectorAll('.rest-card').forEach(card => {
-    card.addEventListener('click', () => openModal(Number(card.dataset.id)));
+    const open = () => openModal(card.dataset.id);
+    card.addEventListener('click', open);
+    card.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' ') open(); });
   });
   cont.querySelectorAll('.card-fav').forEach(btn => {
-    btn.addEventListener('click', e => { e.stopPropagation(); toggleFav(e, Number(btn.dataset.fav)); });
+    btn.addEventListener('click', e => { e.stopPropagation(); toggleFav(e, btn.dataset.fav); });
   });
 }
 
-function renderPagination(totalPages) {
+/* ── PAGINAÇÃO ── */
+function renderPagination(total) {
   const pg = document.getElementById('pagination');
-  if (totalPages <= 1) { pg.innerHTML = ''; return; }
-
-  let html = `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`;
-  for (let i = 1; i <= totalPages; i++) {
-    html += `<button class="page-btn ${i===currentPage?'active':''}" onclick="goPage(${i})">${i}</button>`;
-  }
-  html += `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>›</button>`;
-  pg.innerHTML = html;
+  if (total <= 1) { pg.innerHTML = ''; return; }
+  let h = `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''} aria-label="Página anterior">‹</button>`;
+  for (let i=1; i<=total; i++)
+    h += `<button class="page-btn${i===currentPage?' active':''}" onclick="goPage(${i})" aria-label="Página ${i}"${i===currentPage?' aria-current="page"':''}>${i}</button>`;
+  h += `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===total?'disabled':''} aria-label="Próxima página">›</button>`;
+  pg.innerHTML = h;
 }
-
-function goPage(p) {
+window.goPage = p => {
   if (p < 1) return;
   currentPage = p;
   filterAll();
-  window.scrollTo({top: document.querySelector('.cats-bar').offsetTop - 100, behavior:'smooth'});
-}
+  document.querySelector('.cats-bar').scrollIntoView({ behavior:'smooth', block:'start' });
+};
 
-/* ═══════ CONTROLS ═══════ */
-function setTab(btn, tab) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  currentTab = tab;
-  currentPage = 1;
-  filterAll();
-}
-
-function setPill(btn, val) {
-  document.querySelectorAll('.cat-pill').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  currentPill = val;
-  currentPage = 1;
-  filterAll();
-}
-
-function setPrice(btn, val) {
-  document.querySelectorAll('.price-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  priceFilter = val;
-  currentPage = 1;
-  filterAll();
-}
-
-function setRating(inp) {
-  ratingFilter = parseFloat(inp.value);
-  document.getElementById('rating-val').textContent = ratingFilter > 0 ? ratingFilter + '+ ★' : 'Qualquer';
-  currentPage = 1;
-  filterAll();
-}
-
-function setView(btn, view) {
-  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  currentView = view;
-  filterAll();
-}
-
-function setCity(btn, city) {
-  document.querySelectorAll('.location-pill').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('hero-cidade').value = city;
-  document.getElementById('side-cidade').value = city;
-  currentPage = 1;
-  filterAll();
-}
-
-function onSearchInput() {
-  const val = document.getElementById('main-search').value;
-  const clr = document.getElementById('search-clear');
-  clr.style.display = val ? 'flex' : 'none';
+/* ── CONTROLES ── */
+window.setTab   = (b,t)  => { document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); currentTab=t; currentPage=1; filterAll(); };
+window.setPill  = (b,v)  => { document.querySelectorAll('.cat-pill').forEach(x=>x.classList.remove('active')); b.classList.add('active'); currentPill=v; currentPage=1; filterAll(); };
+window.setPrice = (b,v)  => { document.querySelectorAll('.price-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); priceFilter=v; currentPage=1; filterAll(); };
+window.setRating= inp    => { ratingFilter=parseFloat(inp.value); document.getElementById('rating-val').textContent=ratingFilter>0?ratingFilter+'+ ★':'Qualquer'; currentPage=1; filterAll(); };
+window.setView  = (b,v)  => {
+  document.querySelectorAll('.view-btn').forEach((x,i) => { x.classList.toggle('active',i===(v==='grid'?0:1)); x.setAttribute('aria-pressed', String(i===(v==='grid'?0:1))); });
+  currentView=v; filterAll();
+};
+window.setCity  = (b,c)  => { document.querySelectorAll('.location-pill').forEach(x=>x.classList.remove('active')); b.classList.add('active'); document.getElementById('hero-cidade').value=c; document.getElementById('side-cidade').value=c; currentPage=1; filterAll(); };
+window.onSearchInput = () => {
+  document.getElementById('search-clear').style.display = document.getElementById('main-search').value ? 'flex' : 'none';
   clearTimeout(searchDebounce);
-  searchDebounce = setTimeout(() => { currentPage = 1; filterAll(); }, 280);
-}
+  searchDebounce = setTimeout(() => { currentPage=1; filterAll(); }, 280);
+};
+window.clearSearch = () => { document.getElementById('main-search').value=''; document.getElementById('search-clear').style.display='none'; currentPage=1; filterAll(); };
+window.resetFilters = () => {
+  ['side-cidade','side-bairro'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('hero-cidade').value = '';
+  ['tog-delivery','tog-aberto','tog-acessivel','tog-gluten','tog-promo'].forEach(id => document.getElementById(id).checked=false);
+  priceFilter=''; ratingFilter=0;
+  document.querySelectorAll('.price-btn').forEach(b=>b.classList.toggle('active',b.dataset.val===''));
+  document.querySelector('.rating-slider').value=0;
+  document.getElementById('rating-val').textContent='Qualquer';
+  currentPage=1; filterAll();
+};
 
-function clearSearch() {
-  document.getElementById('main-search').value = '';
-  document.getElementById('search-clear').style.display = 'none';
-  currentPage = 1;
-  filterAll();
-}
-
-function resetFilters() {
-  document.getElementById('side-cidade').value = '';
-  document.getElementById('side-bairro').value = '';
-  document.getElementById('tog-delivery').checked = false;
-  document.getElementById('tog-aberto').checked = false;
-  document.getElementById('tog-acessivel').checked = false;
-  document.getElementById('tog-gluten').checked = false;
-  priceFilter = '';
-  ratingFilter = 0;
-  document.querySelectorAll('.price-btn').forEach(b => b.classList.toggle('active', b.dataset.val === ''));
-  document.querySelector('.rating-slider').value = 0;
-  document.getElementById('rating-val').textContent = 'Qualquer';
-  currentPage = 1;
-  filterAll();
-}
-
-/* ═══════ FAVORITES ═══════ */
+/* ── FAVORITOS ── */
 function toggleFav(e, id) {
   e.stopPropagation();
-  if (favorites.has(id)) {
-    favorites.delete(id);
-    showToast('💔 Removido dos favoritos');
-  } else {
-    favorites.add(id);
-    showToast('❤️ Adicionado aos favoritos!');
-  }
-  // Only update the specific button instead of re-rendering all cards
+  const had = favorites.has(id);
+  had ? favorites.delete(id) : favorites.add(id);
+  localStorage.setItem('edena_favs', JSON.stringify([...favorites]));
+  showToast(had ? '💔 Removido dos favoritos' : '❤️ Adicionado aos favoritos!');
   const btn = e.currentTarget;
-  const isFav = favorites.has(id);
-  btn.textContent = isFav ? '❤️' : '🤍';
-  btn.classList.toggle('active', isFav);
+  const now = favorites.has(id);
+  btn.textContent = now ? '❤️' : '🤍';
+  btn.classList.toggle('active', now);
+  btn.setAttribute('aria-pressed', String(now));
 }
 
-/* ═══════ XSS-SAFE text helper ═══════ */
-function esc(str) {
-  const d = document.createElement('div');
-  d.textContent = String(str);
-  return d.innerHTML;
-}
-
-/* ═══════ MODAL ═══════ */
-function openModal(id) {
-  const r = RESTAURANTES.find(x => x.id === id);
+/* ── MODAL RESTAURANTE ── */
+window.openModal = id => {
+  const r = RESTAURANTES.find(x => String(x.id) === String(id));
   if (!r) return;
 
-  // Build modal using esc() to prevent XSS from any data field
-  const pratosHTML = r.pratos.map(p => `
+  const pratosHTML = (r.pratos||[]).map(p => `
     <div class="menu-item">
       <div>
         <div class="menu-item-name">${esc(p.nome)}</div>
         <div class="menu-item-desc">${esc(p.desc)}</div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
         <div class="menu-item-price">${esc(p.preco)}</div>
-        <button class="btn-pedir" data-rest="${esc(r.id)}">Pedir</button>
+        <button class="btn-pedir">Pedir</button>
       </div>
     </div>`).join('');
 
+  const mapsUrl = r.lat && r.lng
+    ? `https://www.google.com/maps?q=${r.lat},${r.lng}`
+    : `https://www.google.com/maps/search/${encodeURIComponent(r.nome+' '+r.cidade)}`;
+
+  const wppTel = r.telefone ? r.telefone.replace(/\D/g,'') : '';
+  const fotoEl = r.fotoUrl
+    ? `<img src="${esc(r.fotoUrl)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" alt="${esc(r.nome)}">` : '';
+
   document.getElementById('modal-content').innerHTML = `
-    <div class="modal-hero">${esc(r.emoji)}</div>
+    <div class="modal-hero" aria-hidden="true">${esc(r.emoji||'🌿')}${fotoEl}</div>
     <div class="modal-body">
       <div class="modal-name">${esc(r.nome)}</div>
-      <div class="modal-tipo">${esc(r.tipo)} · ${esc(r.cidade)}, ${esc(r.bairro)}</div>
+      <div class="modal-tipo">${esc(r.tipo)} · ${esc(r.cidade)}${r.bairro ? ', '+esc(r.bairro) : ''}</div>
       <div class="modal-info-row">
-        <div class="modal-info-item">⭐ ${esc(r.rating)} (${esc(r.reviews)} avaliações)</div>
+        ${r.rating  ? `<div class="modal-info-item">⭐ ${esc(r.rating)} (${esc(r.reviews||0)} avaliações)</div>` : ''}
         <div class="modal-info-item">💰 ${esc(r.preco)}</div>
-        <div class="modal-info-item">${r.aberto ? '🟢 Aberto agora' : '🔴 Fechado'}</div>
+        <div class="modal-info-item">${r.aberto?'🟢 Aberto agora':'🔴 Fechado'}</div>
         ${r.delivery ? '<div class="modal-info-item">🛵 Delivery</div>' : ''}
+        ${r.promo    ? '<div class="modal-info-item">🔥 Em promoção</div>' : ''}
+        ${r.acessivel? '<div class="modal-info-item">♿ Acessível</div>' : ''}
       </div>
-      <p style="font-size:14px;line-height:1.6;color:var(--muted)">${esc(r.descricao)}</p>
-      <div class="modal-info-row" style="margin-top:12px">
-        <div class="modal-info-item">🕐 ${esc(r.horario)}</div>
-        <div class="modal-info-item">📞 ${esc(r.telefone)}</div>
+      ${r.descricao ? `<p style="font-size:14px;line-height:1.6;color:var(--muted);margin-bottom:12px">${esc(r.descricao)}</p>` : ''}
+      <div class="modal-info-row">
+        ${r.horario  ? `<div class="modal-info-item">🕐 ${esc(r.horario)}</div>` : ''}
+        ${r.telefone ? `<div class="modal-info-item">📞 ${esc(r.telefone)}</div>` : ''}
       </div>
-      <div class="modal-section-title">Cardápio em destaque</div>
-      <div class="menu-items">${pratosHTML}</div>
-      <button class="btn-ver-site" id="modal-ver-site">Ver perfil completo →</button>
+      ${pratosHTML ? `<div class="modal-section-title">Cardápio em destaque</div><div class="menu-items">${pratosHTML}</div>` : ''}
+      <div class="modal-action-btns">
+        ${wppTel ? `<a href="https://wa.me/55${wppTel}" target="_blank" rel="noopener" class="btn-ver-site" style="background:linear-gradient(135deg,#25d366,#128c7e);text-decoration:none;display:block;text-align:center">💬 Chamar no WhatsApp</a>` : ''}
+        <a href="${mapsUrl}" target="_blank" rel="noopener" class="modal-map-btn">🗺️ Ver no Google Maps</a>
+        ${r.telefone ? `<a href="tel:${esc(r.telefone)}" class="modal-tel-btn">📞 Ligar: ${esc(r.telefone)}</a>` : ''}
+      </div>
     </div>`;
 
-  // Attach event listeners safely (no inline onclick with data)
   document.getElementById('modal-content').querySelectorAll('.btn-pedir').forEach(btn => {
-    btn.addEventListener('click', () => showToast('✅ Pedido enviado para ' + r.nome + '!'));
+    btn.addEventListener('click', () => showToast('✅ Pedido enviado para '+r.nome+'!'));
   });
-  const verSite = document.getElementById('modal-ver-site');
-  if (verSite) verSite.addEventListener('click', () => showToast('🌿 Abrindo perfil completo...'));
 
   document.getElementById('modal-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
-}
+};
 
-function closeModal() {
+window.closeModal = () => {
   document.getElementById('modal-overlay').classList.remove('open');
   document.body.style.overflow = '';
-}
+};
+document.getElementById('modal-overlay').addEventListener('click', function(e){ if(e.target===this) closeModal(); });
 
-document.getElementById('modal-overlay').addEventListener('click', function(e){
-  if (e.target === this) closeModal();
-});
+/* ── MAPA (Leaflet) ── */
+window.abrirMapa = () => {
+  document.getElementById('map-panel').classList.add('open');
+  document.body.style.overflow = 'hidden';
 
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
-});
+  // Inicializa mapa com delay para garantir dimensões corretas
+  setTimeout(() => {
+    if (!leafletMap) {
+      leafletMap = L.map('leaflet-map').setView([-20.3, -40.3], 10);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
+        maxZoom: 18
+      }).addTo(leafletMap);
+    }
+    leafletMap.invalidateSize();
 
-/* ═══════ TOAST ═══════ */
-let toastTimer;
-function showToast(msg) {
+    // Remove marcadores antigos
+    leafletMarkers.forEach(m => m.remove());
+    leafletMarkers = [];
+
+    const comCoordenadas = RESTAURANTES.filter(r => r.lat && r.lng);
+    document.getElementById('map-count-label').textContent =
+      comCoordenadas.length + ' restaurante' + (comCoordenadas.length!==1?'s':'') + ' no mapa';
+
+    comCoordenadas.forEach(r => {
+      // FIX: usa string de cor diretamente, sem cssVar() dentro do icon html
+      const iconHtml = `<div style="background:#1e4a22;color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 10px rgba(0,0,0,.35);border:2px solid #fff">${r.emoji||'🌿'}</div>`;
+      const icon = L.divIcon({ html: iconHtml, className:'', iconSize:[36,36], iconAnchor:[18,18] });
+      const marker = L.marker([r.lat, r.lng], { icon })
+        .addTo(leafletMap)
+        .bindPopup(`<b>${r.nome}</b><br><span style="color:#555">${r.tipo}</span><br>${r.cidade}${r.promo?'<br><b style="color:#e05a2b">🔥 Em promoção</b>':''}<br><small>★ ${r.rating||'—'} · ${r.preco}</small>`);
+      marker.on('click', () => { fecharMapa(); setTimeout(() => openModal(r.id), 200); });
+      leafletMarkers.push(marker);
+    });
+
+    // Marcador do usuário
+    if (userLat !== null) {
+      const userIcon = L.divIcon({ html:'<div style="background:#4aa857;border:3px solid #fff;border-radius:50%;width:16px;height:16px;box-shadow:0 0 0 4px rgba(74,168,87,.3)"></div>', className:'', iconSize:[16,16], iconAnchor:[8,8] });
+      const um = L.marker([userLat, userLng], { icon: userIcon }).addTo(leafletMap).bindPopup('📍 Você está aqui');
+      leafletMarkers.push(um);
+      leafletMap.setView([userLat, userLng], 13);
+    }
+  }, 120);
+};
+
+window.fecharMapa = () => {
+  document.getElementById('map-panel').classList.remove('open');
+  document.body.style.overflow = '';
+};
+document.getElementById('map-panel').addEventListener('click', function(e){ if(e.target===this) fecharMapa(); });
+
+/* ── CADASTRO ── */
+window.abrirCadastro = () => {
+  if (!auth.currentUser) {
+    showToast('⚠️ Faça login para cadastrar seu estabelecimento!');
+    abrirLogin();
+    return;
+  }
+  document.getElementById('cad-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+};
+window.fecharCadastro = () => {
+  document.getElementById('cad-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+};
+document.getElementById('cad-overlay').addEventListener('click', function(e){ if(e.target===this) fecharCadastro(); });
+
+window.previewImagem = inp => {
+  const file = inp.files[0];
+  if (!file) return;
+  // Valida tamanho (5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    showToast('⚠️ Foto muito grande. Máximo 5MB.');
+    inp.value = '';
+    return;
+  }
+  const prev = document.getElementById('img-preview');
+  prev.src = URL.createObjectURL(file);
+  prev.style.display = 'block';
+};
+
+window.salvarRestaurante = async () => {
+  // Validação com feedback visual
+  const campos = {
+    'cad-nome':   document.getElementById('cad-nome').value.trim(),
+    'cad-cidade': document.getElementById('cad-cidade').value,
+    'cad-tipo':   document.getElementById('cad-tipo').value.trim(),
+  };
+  let ok = true;
+  Object.entries(campos).forEach(([id, val]) => {
+    const el = document.getElementById(id);
+    if (!val) { el.classList.add('error'); ok = false; }
+    else        el.classList.remove('error');
+  });
+  if (!ok) { showToast('⚠️ Preencha os campos obrigatórios (*)'); return; }
+
+  const btn    = document.getElementById('btn-salvar');
+  const status = document.getElementById('cad-status');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Salvando…';
+  status.style.color = 'var(--muted)';
+  status.textContent = '';
+
+  try {
+    let fotoUrl = null;
+    const fotoInput = document.getElementById('cad-foto');
+    if (fotoInput.files[0]) {
+      status.textContent = '📤 Enviando foto…';
+      const ext    = fotoInput.files[0].name.split('.').pop();
+      const foRef  = sRef(storage, `restaurantes/${Date.now()}.${ext}`);
+      await uploadBytes(foRef, fotoInput.files[0]);
+      fotoUrl = await getDownloadURL(foRef);
+    }
+
+    const tagsRaw = document.getElementById('cad-tags').value;
+    const tags    = tagsRaw
+      ? [...new Set(tagsRaw.split(',').map(t=>t.trim().toLowerCase()).filter(Boolean))]
+      : ['vegano'];
+
+    const doc = {
+      nome:     campos['cad-nome'],
+      cidade:   campos['cad-cidade'],
+      tipo:     campos['cad-tipo'],
+      bairro:   document.getElementById('cad-bairro').value.trim(),
+      preco:    document.getElementById('cad-preco').value,
+      telefone: document.getElementById('cad-tel').value.trim(),
+      horario:  document.getElementById('cad-horario').value.trim(),
+      descricao:document.getElementById('cad-desc').value.trim(),
+      delivery: document.getElementById('cad-delivery').checked,
+      acessivel:document.getElementById('cad-acessivel').checked,
+      semgluten:document.getElementById('cad-gluten').checked,
+      tags, fotoUrl,
+      lat: userLat, lng: userLng,
+      emoji: '🌿', rating:0, reviews:0,
+      aberto:false, novo:true, destaque:false, promo:false, pratos:[],
+      donoId:    auth.currentUser.uid,
+      donoEmail: auth.currentUser.email,
+      criadoEm:  serverTimestamp()
+    };
+
+    status.textContent = '💾 Salvando no banco de dados…';
+    const ref = await addDoc(collection(db,'restaurantes'), doc);
+    RESTAURANTES.push({ id: ref.id, ...doc });
+    atualizarStats();
+    filterAll();
+
+    status.style.color = 'var(--eden-600)';
+    status.textContent = '✅ Cadastrado com sucesso!';
+    showToast('🎉 Estabelecimento cadastrado com sucesso!');
+    setTimeout(fecharCadastro, 1800);
+  } catch(e) {
+    console.error(e);
+    status.style.color = '#c00';
+    status.textContent = '❌ Erro: ' + (e.code || e.message);
+    showToast('❌ Não foi possível salvar. Verifique as regras do Firestore.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🌿 Cadastrar Estabelecimento';
+  }
+};
+
+/* ── TOAST ── */
+let _toastTimer;
+window.showToast = msg => {
   const t = document.getElementById('toast');
   document.getElementById('toast-msg').textContent = msg;
   t.style.display = 'flex';
   t.classList.remove('hide');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { t.classList.add('hide'); setTimeout(()=>t.style.display='none', 300); }, 2500);
-}
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => {
+    t.classList.add('hide');
+    setTimeout(() => t.style.display='none', 300);
+  }, 3200);
+};
 
-/* ═══════ INIT ═══════ */
-filterAll();
+/* ── TECLADO ── */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeModal(); fecharMapa(); fecharCadastro(); fecharLogin();
+  }
+});
+
+/* ── INIT ── */
+carregarRestaurantes();
 </script>
 </body>
 </html>
