@@ -4,9 +4,72 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>EDENA — Salvando Vida, Encontrando Sabor</title>
+<!-- Content Security Policy: protege contra XSS de terceiros -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self' https:;
+  script-src 'self' 'unsafe-inline' https://www.gstatic.com https://unpkg.com https://www.gstatic.com;
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com;
+  font-src https://fonts.gstatic.com;
+  img-src * data: blob:;
+  connect-src https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net wss://*.firebaseio.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org;
+  frame-ancestors 'none';
+">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,800;1,400;1,600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<!-- PWA -->
+<meta name="theme-color" content="#1e4a22">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="EDENA">
+<meta name="description" content="Encontre restaurantes veganos no Espírito Santo. O maior guia de alimentação saudável, vegana e plant-based do ES.">
+<meta name="keywords" content="restaurante vegano, vegano espírito santo, comida vegana vitória, plant-based es, vegetariano es">
+<meta name="robots" content="index, follow">
+<meta name="author" content="EDENA">
+<link rel="canonical" href="https://edena.app/">
+<!-- Open Graph / WhatsApp / Telegram -->
+<meta property="og:type"        content="website">
+<meta property="og:url"         content="https://edena.app/">
+<meta property="og:title"       content="EDENA — Restaurantes Veganos no ES">
+<meta property="og:description" content="Encontre restaurantes, mercados e pratos 100% veganos no Espírito Santo. Localização, avaliações e delivery.">
+<meta property="og:image"       content="https://edena.app/og-image.jpg">
+<meta property="og:locale"      content="pt_BR">
+<meta property="og:site_name"   content="EDENA">
+<!-- Twitter Card -->
+<meta name="twitter:card"        content="summary_large_image">
+<meta name="twitter:title"       content="EDENA — Restaurantes Veganos no ES">
+<meta name="twitter:description" content="O maior guia de alimentação vegana do Espírito Santo.">
+<meta name="twitter:image"       content="https://edena.app/og-image.jpg">
+<link rel="manifest" id="pwa-manifest">
+<!-- JSON-LD Structured Data para Google -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "EDENA",
+  "url": "https://edena.app/",
+  "description": "Guia de restaurantes veganos no Espírito Santo",
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": "https://edena.app/?q={search_term_string}",
+    "query-input": "required name=search_term_string"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "EDENA",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://edena.app/logo.png"
+    }
+  }
+}
+</script>
+<!-- Preconnect DNS antecipado -->
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Carrega apenas os pesos usados, com display=swap para não bloquear render -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,600&family=Outfit:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,600&family=Outfit:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,600&family=Outfit:wght@400;500;600;700&display=swap"></noscript>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" media="print" onload="this.media='all'">
 <style>
 /* ═══════════════════════════════════════════
    TOKENS
@@ -24,12 +87,15 @@
   --eden-50:  #edfaef;
   --gold-500: #b5853a;
   --gold-400: #d4a44c;
-  --bg: #f8f8f6;
+  /* Fundo mais claro e elegante — quase branco com toque verde */
+  --bg: #fafcfa;
+  --bg-alt: #f4f8f5;
   --surface: #ffffff;
-  --border: rgba(30,74,34,0.10);
-  --text: #1a1c1a;
-  --muted: #4a5c4d;
-  --subtle: #8fa392;
+  --border: rgba(30,74,34,0.08);
+  --border-light: rgba(30,74,34,0.05);
+  --text: #1a201b;
+  --muted: #52635a;
+  --subtle: #94a89c;
   --radius-sm: 8px;
   --radius-md: 14px;
   --radius-lg: 20px;
@@ -52,9 +118,30 @@
 @keyframes spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 
+/* ── MOBILE PERFORMANCE: desativa animações pesadas em telas pequenas ── */
+@media(max-width:768px){
+  /* Para folhas flutuantes do hero — consomem GPU desnecessariamente */
+  .leaf{animation:none!important;display:none}
+  /* Gradiente animado do hero → estático */
+  .hero{animation:none!important;background:linear-gradient(160deg,#f5fdf6 0%,#e8f5ea 100%)}
+  /* Cards: sem transform 3D no hover (heavy em Adreno/Mali) */
+  .rest-card:hover{transform:none;box-shadow:var(--shadow-md)}
+  /* Shimmer mais leve */
+  .skel-img,.skel-line{animation-duration:2s}
+  /* Sem backdrop-filter custoso em modais */
+  .modal-overlay,.cad-overlay,.login-overlay,.painel-overlay{backdrop-filter:none;background:rgba(0,0,0,.7)}
+  /* Badge dot animado → estático */
+  .badge-dot{animation:none}
+}
+
+/* ── WILL-CHANGE apenas onde realmente anima ── */
+.rest-card{will-change:transform}
+.modal-box,.cad-box,.login-box,.painel-box{will-change:transform,opacity}
+/* Limpa will-change após animação terminar via JS */
+
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 a{text-decoration:none;color:inherit}
 button{cursor:pointer;font-family:inherit}
 input,select,textarea{font-family:inherit}
@@ -65,7 +152,7 @@ input,select,textarea{font-family:inherit}
 ::-webkit-scrollbar-thumb:hover{background:var(--eden-300)}
 
 /* ═══ HEADER ═══ */
-.header{position:sticky;top:0;z-index:200;background:rgba(252,252,250,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:0 24px}
+.header{position:sticky;top:0;z-index:200;background:rgba(255,255,255,.92);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border-bottom:1px solid var(--border-light);padding:0 24px;box-shadow:0 1px 0 rgba(30,74,34,.06)}
 .header-inner{max-width:1300px;margin:0 auto;display:flex;align-items:center;gap:20px;height:64px}
 .logo{display:flex;align-items:center;gap:10px;text-decoration:none;flex-shrink:0}
 .logo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--eden-700),var(--eden-500));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 3px 12px rgba(39,96,48,.3)}
@@ -88,8 +175,8 @@ input,select,textarea{font-family:inherit}
 #btn-logout:hover{color:#c00;border-color:#c00}
 
 /* ═══ HERO ═══ */
-.hero{position:relative;overflow:hidden;padding:64px 24px 56px;text-align:center;background:linear-gradient(160deg,#eaf6ec 0%,#ddf0e4 30%,#d4eedd 60%,#ecf7ee 100%);background-size:300% 300%;animation:gradientShift 16s ease infinite}
-.hero::before{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 60% 70% at 10% 30%,rgba(74,168,87,.07) 0%,transparent 60%),radial-gradient(ellipse 50% 60% at 90% 20%,rgba(39,96,48,.05) 0%,transparent 60%)}
+.hero{position:relative;overflow:hidden;padding:72px 24px 64px;text-align:center;background:linear-gradient(160deg,#f5fdf6 0%,#edf8ef 35%,#e8f5ea 65%,#f2faf3 100%);background-size:300% 300%;animation:gradientShift 20s ease infinite}
+.hero::before{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 60% 70% at 10% 30%,rgba(74,168,87,.05) 0%,transparent 60%),radial-gradient(ellipse 50% 60% at 90% 20%,rgba(39,96,48,.04) 0%,transparent 60%),radial-gradient(ellipse 40% 50% at 50% 110%,rgba(181,133,58,.03) 0%,transparent 60%)}
 .leaf{position:absolute;font-size:32px;opacity:.18;pointer-events:none;user-select:none}
 .leaf:nth-child(1){top:8%;left:5%;animation:leafFloat 6s ease-in-out infinite;font-size:28px}
 .leaf:nth-child(2){top:15%;right:6%;animation:leafFloat2 7s ease-in-out infinite;font-size:36px}
@@ -124,10 +211,10 @@ input,select,textarea{font-family:inherit}
 .stat-label{font-size:12px;color:var(--muted);font-weight:500;margin-top:4px;display:block}
 
 /* ═══ CATEGORIAS ═══ */
-.cats-bar{background:#fff;border-bottom:1px solid var(--border);padding:0 24px;position:sticky;top:64px;z-index:100}
+.cats-bar{background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border-bottom:1px solid var(--border-light);padding:0 24px;position:sticky;top:64px;z-index:100}
 .cats-inner{max-width:1300px;margin:0 auto;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:12px 0}
 .cats-inner::-webkit-scrollbar{display:none}
-.cat-pill{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius-pill);border:1.5px solid rgba(0,0,0,0.08);background:#f4f4f2;font-size:13px;font-weight:500;color:var(--muted);white-space:nowrap;transition:all .2s var(--ease-spring);flex-shrink:0}
+.cat-pill{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius-pill);border:1.5px solid rgba(30,74,34,.07);background:#f6faf7;font-size:13px;font-weight:500;color:var(--muted);white-space:nowrap;transition:all .2s var(--ease-spring);flex-shrink:0}
 .cat-pill:hover{border-color:var(--eden-300);color:var(--eden-700);background:var(--eden-50);transform:translateY(-1px)}
 .cat-pill.active{background:var(--eden-700);border-color:var(--eden-700);color:#fff;box-shadow:0 2px 10px rgba(39,96,48,.25);transform:translateY(-1px)}
 .cat-pill .emoji{font-size:16px;line-height:1}
@@ -135,16 +222,16 @@ input,select,textarea{font-family:inherit}
 /* ═══ MAIN ═══ */
 .main{max-width:1300px;margin:0 auto;padding:28px 24px 60px;display:grid;grid-template-columns:280px 1fr;gap:28px;align-items:start}
 .sidebar{position:sticky;top:130px;display:flex;flex-direction:column;gap:16px}
-.filter-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow-sm)}
+.filter-card{background:var(--surface);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:20px;box-shadow:0 1px 3px rgba(13,32,16,.04)}
 .filter-title{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
 .filter-reset-btn{font-size:11px;font-weight:500;color:var(--eden-500);background:none;border:none;cursor:pointer;text-transform:none;letter-spacing:0}
 .filter-group{margin-bottom:14px}
 .filter-group:last-child{margin-bottom:0}
 .filter-label{font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px}
-.filter-select{width:100%;padding:9px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:#f4f4f2;transition:border-color .15s}
+.filter-select{width:100%;padding:9px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:#f7faf8;transition:border-color .15s;color:var(--text)}
 .filter-select:focus{border-color:var(--eden-400);outline:none;background:#fff}
 .price-row{display:flex;gap:6px}
-.price-btn{flex:1;padding:7px 0;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:#f4f4f2;font-size:13px;font-weight:600;color:var(--muted);transition:all .15s}
+.price-btn{flex:1;padding:7px 0;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:#f7faf8;font-size:13px;font-weight:600;color:var(--muted);transition:all .15s}
 .price-btn:hover{border-color:var(--eden-300);color:var(--eden-700)}
 .price-btn.active{border-color:var(--eden-600);background:var(--eden-50);color:var(--eden-700)}
 .rating-slider{width:100%;accent-color:var(--eden-500);margin-top:6px}
@@ -186,8 +273,8 @@ input,select,textarea{font-family:inherit}
 .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px}
 .cards-list{display:flex;flex-direction:column;gap:14px}
 .skeleton{background:linear-gradient(90deg,var(--eden-100) 25%,var(--eden-50) 50%,var(--eden-100) 75%);background-size:800px 100%;animation:shimmer 1.4s infinite linear;border-radius:var(--radius-md)}
-.rest-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-sm);transition:all .25s var(--ease-spring);cursor:pointer;display:flex;flex-direction:column;animation:fadeUp .4s var(--ease-out) both}
-.rest-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);border-color:var(--eden-200)}
+.rest-card{background:var(--surface);border:1px solid var(--border-light);border-radius:var(--radius-lg);overflow:hidden;box-shadow:0 1px 4px rgba(13,32,16,.05),0 0 0 1px rgba(13,32,16,.04);transition:all .25s var(--ease-spring);cursor:pointer;display:flex;flex-direction:column;animation:fadeUp .4s var(--ease-out) both}
+.rest-card:hover{transform:translateY(-5px);box-shadow:0 12px 40px rgba(13,32,16,.12),0 0 0 1px rgba(74,168,87,.15);border-color:transparent}
 .rest-card-list{flex-direction:row}
 .rest-card-list .card-img-wrap{width:160px;flex-shrink:0;height:auto;min-height:140px}
 .rest-card-list .card-body{flex:1}
@@ -214,7 +301,7 @@ input,select,textarea{font-family:inherit}
 .card-dot{margin:0 4px}
 .card-dist{font-size:11px;color:var(--eden-600);font-weight:600;margin-left:4px;background:var(--eden-50);padding:2px 6px;border-radius:var(--radius-pill)}
 .card-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px}
-.tag{padding:3px 8px;background:var(--eden-50);border:1px solid var(--eden-100);border-radius:var(--radius-pill);font-size:11px;font-weight:500;color:var(--eden-700)}
+.tag{padding:3px 9px;background:rgba(237,250,239,.7);border:1px solid rgba(168,227,176,.5);border-radius:var(--radius-pill);font-size:11px;font-weight:500;color:var(--eden-700);letter-spacing:.2px}
 .card-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:auto;padding-top:10px;border-top:1px solid var(--border)}
 .meta-item{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px}
 .meta-icon{font-size:13px}
@@ -335,6 +422,137 @@ input,select,textarea{font-family:inherit}
   .hero-stats{gap:20px}
   .search-box input{font-size:14px}
 }
+
+/* ═══ SKELETON LOADING ═══ */
+.skel-wrap { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:18px; }
+.skel-card { border-radius:var(--radius-lg); overflow:hidden; background:var(--surface); box-shadow:var(--shadow-sm); }
+.skel-img  { height:180px; background:linear-gradient(90deg,var(--eden-100) 25%,#f0faf1 50%,var(--eden-100) 75%); background-size:800px 100%; animation:shimmer 1.4s infinite linear; }
+.skel-body { padding:16px; display:flex; flex-direction:column; gap:10px; }
+.skel-line { height:12px; border-radius:6px; background:linear-gradient(90deg,var(--eden-100) 25%,#f0faf1 50%,var(--eden-100) 75%); background-size:800px 100%; animation:shimmer 1.4s infinite linear; }
+.skel-line.wide  { width:75%; }
+.skel-line.short { width:45%; }
+.skel-line.xshort{ width:30%; }
+
+/* ═══ BANNER INSTALAR PWA ═══ */
+#install-banner {
+  display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+  background:var(--eden-800); color:#fff; border-radius:var(--radius-xl);
+  padding:14px 20px; box-shadow:var(--shadow-xl); z-index:800;
+  align-items:center; gap:14px; max-width:420px; width:calc(100% - 32px);
+  animation:fadeUp .4s var(--ease-out);
+}
+#install-banner.show { display:flex; }
+.install-text { flex:1; }
+.install-text strong { font-size:14px; display:block; margin-bottom:2px; }
+.install-text span   { font-size:12px; opacity:.8; }
+.btn-instalar { padding:9px 18px; border-radius:var(--radius-pill); border:none; background:var(--eden-400); color:#fff; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; transition:background .15s; }
+.btn-instalar:hover  { background:var(--eden-300); }
+.btn-dismiss-install { background:none; border:none; color:rgba(255,255,255,.6); font-size:20px; cursor:pointer; padding:0 4px; line-height:1; }
+
+/* ═══ BANNER OFFLINE ═══ */
+#offline-banner {
+  display:none; position:fixed; top:64px; left:0; right:0; z-index:300;
+  background:#b45309; color:#fff; text-align:center;
+  padding:8px 16px; font-size:13px; font-weight:600;
+}
+#offline-banner.show { display:block; }
+
+/* ═══ PAINEL DO DONO ═══ */
+#painel-overlay { position:fixed; inset:0; z-index:600; background:rgba(13,32,16,.7); backdrop-filter:blur(8px); display:none; align-items:flex-start; justify-content:flex-end; }
+#painel-overlay.open { display:flex; animation:fadeIn .2s var(--ease-out); }
+#painel-box {
+  background:var(--surface); width:100%; max-width:480px; height:100vh;
+  overflow-y:auto; box-shadow:var(--shadow-xl); display:flex; flex-direction:column;
+  animation:slideIn .3s var(--ease-out);
+}
+@keyframes slideIn { from{transform:translateX(100%)} to{transform:translateX(0)} }
+.painel-header { padding:20px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; background:var(--surface); z-index:5; }
+.painel-header h2 { font-family:'Playfair Display',serif; font-size:20px; font-weight:800; }
+.painel-body { padding:24px; flex:1; }
+.painel-section { margin-bottom:24px; }
+.painel-section-title { font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; }
+.meu-rest-card { background:var(--bg); border:1.5px solid var(--border); border-radius:var(--radius-lg); padding:16px; display:flex; gap:14px; align-items:center; margin-bottom:10px; cursor:pointer; transition:all .2s; }
+.meu-rest-card:hover { border-color:var(--eden-300); background:var(--eden-50); }
+.meu-rest-emoji { font-size:32px; flex-shrink:0; }
+.meu-rest-info  { flex:1; min-width:0; }
+.meu-rest-nome  { font-weight:700; font-size:15px; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.meu-rest-sub   { font-size:12px; color:var(--muted); }
+.meu-rest-status { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+.status-pill { padding:3px 10px; border-radius:var(--radius-pill); font-size:11px; font-weight:600; }
+.status-ativo   { background:var(--eden-50); color:var(--eden-700); border:1px solid var(--eden-200); }
+.status-pendente{ background:#fef9c3; color:#92400e; border:1px solid #fde68a; }
+.painel-actions { display:flex; flex-direction:column; gap:10px; }
+.btn-painel-action { padding:12px 16px; border-radius:var(--radius-lg); border:1.5px solid var(--border); background:var(--surface); font-size:14px; font-weight:600; color:var(--text); text-align:left; display:flex; align-items:center; gap:10px; transition:all .15s; cursor:pointer; }
+.btn-painel-action:hover { background:var(--eden-50); border-color:var(--eden-300); color:var(--eden-700); }
+.btn-painel-action .action-icon { font-size:20px; }
+.btn-painel-action .action-desc { font-size:12px; color:var(--muted); font-weight:400; margin-top:1px; }
+.painel-stat-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.painel-stat { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px; text-align:center; }
+.painel-stat-num { font-family:'Playfair Display',serif; font-size:24px; font-weight:800; color:var(--eden-700); }
+.painel-stat-label { font-size:11px; color:var(--muted); margin-top:2px; }
+
+/* ═══ TOGGLE PROMO (painel dono) ═══ */
+.promo-toggle-wrap { background:linear-gradient(135deg,rgba(224,90,43,.08),rgba(240,128,48,.05)); border:1.5px solid rgba(224,90,43,.2); border-radius:var(--radius-lg); padding:16px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.promo-toggle-info strong { font-size:14px; display:block; }
+.promo-toggle-info span   { font-size:12px; color:var(--muted); }
+
+/* ═══ SHARE BUTTON ═══ */
+.btn-share { position:absolute; top:14px; left:14px; background:rgba(255,255,255,.85); backdrop-filter:blur(6px); border:none; border-radius:50%; width:36px; height:36px; font-size:16px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:var(--shadow-sm); z-index:10; transition:transform .2s var(--ease-spring); }
+.btn-share:hover { transform:scale(1.1); }
+
+/* ═══ SCROLL TO TOP ═══ */
+#scroll-top { position:fixed; bottom:24px; right:24px; width:44px; height:44px; border-radius:50%; background:var(--eden-700); color:#fff; border:none; font-size:20px; cursor:pointer; box-shadow:var(--shadow-lg); display:none; align-items:center; justify-content:center; z-index:400; transition:all .2s var(--ease-spring); }
+#scroll-top.show { display:flex; }
+#scroll-top:hover { transform:scale(1.1) translateY(-2px); background:var(--eden-600); }
+
+/* ═══ CONTAGEM ATIVA DE FILTROS ═══ */
+.filter-count-badge { background:var(--eden-500); color:#fff; border-radius:50%; width:18px; height:18px; font-size:11px; font-weight:700; display:none; align-items:center; justify-content:center; flex-shrink:0; }
+.filter-count-badge.show { display:flex; }
+
+@media(max-width:600px){
+  #painel-box { max-width:100%; }
+  .painel-stat-row { grid-template-columns:1fr 1fr; }
+}
+
+/* ═══ LOW-END DEVICE ═══ */
+.low-end * { animation:none!important; transition-duration:.05s!important; }
+.low-end .leaf { display:none; }
+
+/* ═══ MONETIZAÇÃO: PLANOS ═══ */
+#planos-overlay{position:fixed;inset:0;z-index:800;background:rgba(10,20,12,.75);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:16px}
+#planos-overlay.open{display:flex;animation:fadeIn .2s var(--ease-out)}
+#planos-box{background:var(--surface);border-radius:var(--radius-xl);width:100%;max-width:740px;max-height:92vh;overflow-y:auto;box-shadow:var(--shadow-xl);animation:fadeUp .3s var(--ease-out)}
+.planos-header{padding:28px 28px 0;text-align:center}
+.planos-header h2{font-family:'Playfair Display',serif;font-size:26px;font-weight:800;margin-bottom:8px}
+.planos-header p{font-size:15px;color:var(--muted);max-width:420px;margin:0 auto 24px}
+.planos-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:0 28px 28px}
+.plano-card{border-radius:var(--radius-lg);padding:24px;position:relative;display:flex;flex-direction:column;gap:12px}
+.plano-free{background:var(--bg-alt);border:1.5px solid var(--border)}
+.plano-pro{background:linear-gradient(145deg,#0f2e14,#1e4a22);color:#fff;border:none;box-shadow:0 8px 32px rgba(13,32,16,.3)}
+.plano-badge{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border-radius:var(--radius-pill);display:inline-block;width:fit-content}
+.plano-free .plano-badge{background:var(--eden-100);color:var(--eden-700)}
+.plano-pro  .plano-badge{background:var(--gold-400);color:#fff}
+.plano-nome{font-family:'Playfair Display',serif;font-size:22px;font-weight:800}
+.plano-preco{font-size:32px;font-weight:800;line-height:1}
+.plano-preco span{font-size:14px;font-weight:400;opacity:.7}
+.plano-desc{font-size:13px;opacity:.8;line-height:1.5}
+.plano-items{list-style:none;display:flex;flex-direction:column;gap:8px;flex:1}
+.plano-items li{font-size:13px;display:flex;align-items:flex-start;gap:8px;line-height:1.4}
+.plano-items li::before{content:'✓';font-weight:700;flex-shrink:0}
+.plano-pro .plano-items li::before{color:var(--eden-300)}
+.plano-free .plano-items li::before{color:var(--eden-500)}
+.plano-items li.no::before{content:'✗';opacity:.4}
+.btn-plano{padding:13px;border-radius:var(--radius-lg);font-size:14px;font-weight:700;border:none;cursor:pointer;transition:all .2s;margin-top:auto}
+.btn-plano-free{background:var(--eden-50);color:var(--eden-700);border:1.5px solid var(--eden-200)}
+.btn-plano-free:hover{background:var(--eden-100)}
+.btn-plano-pro{background:linear-gradient(135deg,var(--gold-400),#e8c278);color:#1a1a00;box-shadow:0 4px 16px rgba(212,164,76,.4)}
+.btn-plano-pro:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(212,164,76,.5)}
+.plano-popular{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--gold-400),var(--gold-300));color:#1a1a00;font-size:11px;font-weight:800;padding:4px 14px;border-radius:var(--radius-pill);white-space:nowrap;box-shadow:0 2px 8px rgba(212,164,76,.4);letter-spacing:.5px}
+.badge-pro{background:linear-gradient(135deg,#b5853a,#d4a44c);color:#fff;font-size:9px;font-weight:800;padding:2px 6px;border-radius:var(--radius-pill);letter-spacing:.5px;text-transform:uppercase;vertical-align:middle;margin-left:4px}
+/* botão de planos no sidebar */
+.btn-ver-planos{width:100%;padding:11px;border-radius:var(--radius-lg);border:none;background:linear-gradient(135deg,#0f2e14,#1e4a22);color:#fff;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s;margin-top:8px}
+.btn-ver-planos:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(13,32,16,.3)}
+@media(max-width:600px){.planos-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -358,10 +576,13 @@ input,select,textarea{font-family:inherit}
       <div id="user-display">
         <div class="user-avatar">🌿</div>
         <span id="user-name-text"></span>
+        <span id="role-badge" style="font-size:11px;background:var(--gold-100);color:var(--gold-500);padding:2px 8px;border-radius:var(--radius-pill);border:1px solid var(--gold-300);display:none"></span>
         <button id="btn-logout" onclick="fazerLogout()">Sair</button>
+        <button class="btn-entrar" id="btn-painel" onclick="abrirPainel()" title="Meu Painel" style="display:none">📊 Painel</button>
       </div>
       <button class="btn-entrar" id="btn-entrar" onclick="abrirLogin()">Entrar</button>
       <button class="btn-cadastrar" onclick="abrirCadastro()">+ Cadastrar</button>
+      <button class="btn-entrar" onclick="abrirPlanos()" style="background:linear-gradient(135deg,var(--gold-400),#e8c278);color:#1a1a00;border:none;font-weight:700" title="Ver planos">⭐ PRO</button>
     </div>
   </div>
 </header>
@@ -392,7 +613,7 @@ input,select,textarea{font-family:inherit}
           <option value="Colatina">Colatina</option>
         </select>
         <button class="btn-geo" id="btn-geo" onclick="usarGeolocalizacao()" title="Usar minha localização" aria-label="Usar geolocalização">📡</button>
-        <button class="btn-buscar" onclick="filterAll()">Buscar</button>
+        <button class="btn-buscar" id="btn-buscar-main" onclick="buscarComFeedback()">Buscar</button>
       </div>
       <div class="location-row">
         <span style="font-size:12px;color:var(--muted)">Popular:</span>
@@ -463,7 +684,7 @@ input,select,textarea{font-family:inherit}
     </div>
 
     <div class="filter-card">
-      <div class="filter-title">🎛️ Filtros</div>
+      <div class="filter-title">🎛️ Filtros <span class="filter-count-badge" id="filter-badge"></span></div>
       <div class="filter-group">
         <span class="filter-label">Faixa de preço</span>
         <div class="price-row">
@@ -509,6 +730,7 @@ input,select,textarea{font-family:inherit}
       <h4>🌿 Cadastre seu estabelecimento</h4>
       <p>Apareça para milhares de veganos do ES. Comece grátis!</p>
       <button class="btn-promo" onclick="abrirCadastro()">Cadastrar agora →</button>
+      <button class="btn-ver-planos" onclick="abrirPlanos()" style="margin-top:12px">⭐ Ver Plano PRO</button>
     </div>
   </aside>
 
@@ -557,6 +779,7 @@ input,select,textarea{font-family:inherit}
 <div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-label="Detalhes do restaurante">
   <div class="modal-box">
     <button class="modal-close" onclick="closeModal()" aria-label="Fechar">✕</button>
+    <button class="btn-share" id="modal-share-btn" aria-label="Compartilhar">📤</button>
     <div id="modal-content"></div>
   </div>
 </div>
@@ -689,8 +912,182 @@ input,select,textarea{font-family:inherit}
 <!-- TOAST -->
 <div id="toast" role="status" aria-live="polite"><span id="toast-msg"></span></div>
 
+<!-- MODAL PLANOS / MONETIZAÇÃO -->
+<div id="planos-overlay" onclick="if(event.target===this)fecharPlanos()">
+  <div id="planos-box" role="dialog" aria-modal="true" aria-label="Planos EDENA">
+    <div class="planos-header">
+      <div style="font-size:36px;margin-bottom:8px">🌿</div>
+      <h2>Escolha seu Plano</h2>
+      <p>Coloque seu estabelecimento na frente de milhares de veganos do ES. Comece grátis, cresça com o PRO.</p>
+      <button class="btn-fechar" onclick="fecharPlanos()" style="position:absolute;top:16px;right:16px" aria-label="Fechar">✕</button>
+    </div>
+    <div class="planos-grid">
+
+      <!-- FREE -->
+      <div class="plano-card plano-free">
+        <span class="plano-badge">Free</span>
+        <div class="plano-nome">Básico</div>
+        <div class="plano-preco">R$ 0 <span>/ mês</span></div>
+        <div class="plano-desc">Ideal para começar a aparecer para clientes veganos do ES.</div>
+        <ul class="plano-items">
+          <li>Perfil na listagem</li>
+          <li>Foto do estabelecimento</li>
+          <li>Link para WhatsApp e Maps</li>
+          <li>Cardápio básico (até 3 pratos)</li>
+          <li class="no" style="opacity:.45">Badge de destaque</li>
+          <li class="no" style="opacity:.45">Aparecer primeiro nos resultados</li>
+          <li class="no" style="opacity:.45">Badge 🔥 Promoção</li>
+          <li class="no" style="opacity:.45">Analytics detalhado</li>
+          <li class="no" style="opacity:.45">Pratos ilimitados</li>
+          <li class="no" style="opacity:.45">Suporte prioritário</li>
+        </ul>
+        <button class="btn-plano btn-plano-free" onclick="fecharPlanos();abrirCadastro()">Começar grátis →</button>
+      </div>
+
+      <!-- PRO -->
+      <div class="plano-card plano-pro" style="position:relative">
+        <div class="plano-popular">⭐ MAIS POPULAR</div>
+        <span class="plano-badge">Pro</span>
+        <div class="plano-nome">PRO</div>
+        <div class="plano-preco">R$ 49 <span>/ mês</span></div>
+        <div class="plano-desc" style="opacity:.85">Para estabelecimentos sérios que querem dominar a busca vegana do ES.</div>
+        <ul class="plano-items">
+          <li>Tudo do plano Básico</li>
+          <li><strong>Badge ⭐ Destaque</strong> — aparece primeiro</li>
+          <li><strong>Badge 🔥 Promoção</strong> ativável a qualquer hora</li>
+          <li><strong>Pratos ilimitados</strong> no cardápio</li>
+          <li><strong>Analytics real</strong>: cliques, favoritos, WhatsApp</li>
+          <li><strong>Pin destacado</strong> no mapa (emoji personalizado)</li>
+          <li><strong>Posição prioritária</strong> na busca por relevância</li>
+          <li><strong>Suporte via WhatsApp</strong> em até 4h</li>
+          <li>Relatório mensal de desempenho</li>
+          <li>Link direto compartilhável</li>
+        </ul>
+        <button class="btn-plano btn-plano-pro" onclick="assinarPro()">✨ Assinar PRO — R$ 49/mês</button>
+      </div>
+
+    </div>
+    <div style="text-align:center;padding:0 28px 24px;font-size:12px;color:var(--muted)">
+      💳 Pagamento via Pix, cartão ou boleto · Cancele quando quiser · Sem taxa de setup
+    </div>
+  </div>
+</div>
+
+<!-- OFFLINE BANNER -->
+<div id="offline-banner">📡 Sem conexão — exibindo dados locais</div>
+
+<!-- INSTALL BANNER PWA -->
+<div id="install-banner">
+  <div class="install-text">
+    <strong>🌿 Instalar EDENA</strong>
+    <span>Acesse offline, mais rápido, como um app</span>
+  </div>
+  <button class="btn-instalar" id="btn-instalar-pwa">Instalar</button>
+  <button class="btn-dismiss-install" id="btn-dismiss-install" aria-label="Fechar">✕</button>
+</div>
+
+<!-- SCROLL TO TOP -->
+<button id="scroll-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Voltar ao topo">↑</button>
+
+<!-- PAINEL DO DONO -->
+<div id="painel-overlay" onclick="if(event.target===this)fecharPainel()">
+  <div id="painel-box" role="dialog" aria-modal="true" aria-label="Painel do estabelecimento">
+    <div class="painel-header">
+      <h2>📊 Meu Painel</h2>
+      <button class="btn-fechar" onclick="fecharPainel()" aria-label="Fechar painel">✕</button>
+    </div>
+    <div class="painel-body">
+
+      <!-- Estatísticas rápidas -->
+      <div class="painel-section">
+        <div class="painel-section-title">Visão geral</div>
+        <div class="painel-stat-row">
+          <div class="painel-stat">
+            <div class="painel-stat-num" id="ps-views">—</div>
+            <div class="painel-stat-label">Visualizações hoje</div>
+          </div>
+          <div class="painel-stat">
+            <div class="painel-stat-num" id="ps-favs">—</div>
+            <div class="painel-stat-label">Salvos como favorito</div>
+          </div>
+          <div class="painel-stat">
+            <div class="painel-stat-num" id="ps-wpp">—</div>
+            <div class="painel-stat-label">Cliques WhatsApp</div>
+          </div>
+          <div class="painel-stat">
+            <div class="painel-stat-num" id="ps-maps">—</div>
+            <div class="painel-stat-label">Abertos no Maps</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Meus restaurantes -->
+      <div class="painel-section">
+        <div class="painel-section-title">Meus estabelecimentos</div>
+        <div id="meus-restaurantes-list">
+          <div style="text-align:center;padding:20px;color:var(--muted);font-size:14px">
+            <div class="big-spinner" style="margin:0 auto 12px"></div>
+            Carregando…
+          </div>
+        </div>
+      </div>
+
+      <!-- Promoção ativa -->
+      <div class="painel-section" id="promo-section" style="display:none">
+        <div class="painel-section-title">🔥 Promoção</div>
+        <div class="promo-toggle-wrap">
+          <div class="promo-toggle-info">
+            <strong>Ativar badge de promoção</strong>
+            <span>Aparece em destaque na busca e no mapa</span>
+          </div>
+          <span class="toggle">
+            <input type="checkbox" id="tog-promo-ativo" onchange="togglePromoRestaurante(this)">
+            <span class="toggle-track"></span>
+            <span class="toggle-thumb"></span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Ações rápidas -->
+      <div class="painel-section">
+        <div class="painel-section-title">Ações</div>
+        <div class="painel-actions">
+          <button class="btn-painel-action" onclick="fecharPainel();abrirCadastro()">
+            <span class="action-icon">➕</span>
+            <div>
+              <div>Cadastrar novo estabelecimento</div>
+              <div class="action-desc">Adicione outro local da sua rede</div>
+            </div>
+          </button>
+          <button class="btn-painel-action" id="btn-toggle-aberto">
+            <span class="action-icon" id="aberto-icon">🟢</span>
+            <div>
+              <div id="aberto-label">Marcar como aberto agora</div>
+              <div class="action-desc">Atualiza em tempo real para os usuários</div>
+            </div>
+          </button>
+          <button class="btn-painel-action" onclick="compartilharRestaurante(meusRestaurantes[0])">
+            <span class="action-icon">📤</span>
+            <div>
+              <div>Compartilhar meu restaurante</div>
+              <div class="action-desc">Link direto para seu perfil</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <p style="font-size:11px;color:var(--subtle);text-align:center;line-height:1.6;margin-top:8px">
+        Estatísticas em desenvolvimento. Em breve: relatórios de alcance, avaliações e muito mais.
+      </p>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════ Leaflet (carregado antes do módulo JS) ══════════ -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" media="print" onload="this.media='all'">
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
 <!-- ══════════ Firebase + App Logic (único módulo) ══════════ -->
 <script type="module">
@@ -703,6 +1100,7 @@ import { getAuth, signInWithPopup, GoogleAuthProvider,
          createUserWithEmailAndPassword, signInWithEmailAndPassword,
          signOut, onAuthStateChanged }
                                    from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+import { getAnalytics, logEvent }  from "https://www.gstatic.com/firebasejs/11.1.0/firebase-analytics.js";
 
 /* ── CONFIG ── */
 const FB = initializeApp({
@@ -713,10 +1111,20 @@ const FB = initializeApp({
   messagingSenderId: "615815897277",
   appId:             "1:615815897277:web:a58e2d6e4aa798565657d4"
 });
-const db      = getFirestore(FB);
-const storage = getStorage(FB);
-const auth    = getAuth(FB);
-const gp      = new GoogleAuthProvider();
+const db        = getFirestore(FB);
+const storage   = getStorage(FB);
+const auth      = getAuth(FB);
+const gp        = new GoogleAuthProvider();
+const analytics = (() => { try { return getAnalytics(FB); } catch { return null; } })();
+
+// Helper: dispara evento GA4 com segurança
+function logEvento(nome, params = {}) {
+  try { if (analytics) logEvent(analytics, nome, params); } catch {}
+  // Log local em dev
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+    console.log('[Analytics]', nome, params);
+  }
+}
 
 /* ── SEED DATA (fallback enquanto Firestore está vazio) ── */
 const SEED = [
@@ -734,6 +1142,41 @@ const SEED = [
   {id:'s12', nome:"Templo da Saúde",      tipo:"Restaurante por Kg Vegano",    cidade:"Vitoria",    bairro:"Centro",            emoji:"🥗", rating:4.6, reviews:289, preco:"$",   delivery:false, aberto:true,  acessivel:true,  semgluten:false, novo:false, destaque:false, promo:false, tags:["por-quilo","vegano","almoço"],               descricao:"Tradicional restaurante por quilo 100% vegano.",         horario:"Seg-Sex 11h-15h",            telefone:"(27) 3221-3344", lat:-20.319, lng:-40.338, pratos:[{nome:"Buffet Vegano (100g)",  desc:"Variedade diária",             preco:"R$ 5,90"}]},
 ];
 
+/* ══════════════════════════════════════════════════════════════
+   REGRAS FIRESTORE — cole isso no console do Firebase:
+   https://console.firebase.google.com → Firestore → Regras
+
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+
+       // Qualquer um lê restaurantes
+       match /restaurantes/{id} {
+         allow read: if true;
+
+         // Só cria se autenticado, campos obrigatórios presentes e válidos
+         allow create: if request.auth != null
+           && request.resource.data.keys().hasAll(['nome','cidade','tipo','donoId'])
+           && request.resource.data.nome is string
+           && request.resource.data.nome.size() >= 3
+           && request.resource.data.nome.size() <= 100
+           && request.resource.data.cidade is string
+           && request.resource.data.tipo is string
+           && request.resource.data.donoId == request.auth.uid;
+
+         // Só o dono edita/deleta o próprio documento
+         allow update, delete: if request.auth != null
+           && resource.data.donoId == request.auth.uid;
+       }
+
+       // Perfis de usuário (role): só o próprio usuário lê/escreve
+       match /usuarios/{uid} {
+         allow read, write: if request.auth != null && request.auth.uid == uid;
+       }
+     }
+   }
+══════════════════════════════════════════════════════════════ */
+
 /* ── STATE ── */
 let RESTAURANTES = [];
 let currentPill  = '', currentTab = 'restaurantes', priceFilter = '', ratingFilter = 0;
@@ -742,6 +1185,7 @@ const PER_PAGE   = 9;
 let favorites    = new Set(JSON.parse(localStorage.getItem('edena_favs') || '[]'));
 let searchDebounce, userLat = null, userLng = null;
 let leafletMap   = null, leafletMarkers = [];
+let currentUserRole = 'user'; // 'user' | 'restaurante' | 'admin'
 
 /* ── UTILS ── */
 function esc(s) {
@@ -749,19 +1193,59 @@ function esc(s) {
   d.textContent = String(s ?? '');
   return d.innerHTML;
 }
-function haversine(la1,ln1,la2,ln2){
-  const R=6371, dL=(la2-la1)*Math.PI/180, dN=(ln2-ln1)*Math.PI/180;
-  const a=Math.sin(dL/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dN/2)**2;
-  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+
+// Sanitiza strings antes de salvar: remove HTML, limita tamanho
+function sanitize(s, maxLen = 200) {
+  return String(s ?? '').replace(/<[^>]*>/g, '').trim().slice(0, maxLen);
 }
-function cssVar(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+// Valida e-mail
+function isValidEmail(e) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+}
+
+// Haversine — distância real em km
+function haversine(la1, ln1, la2, ln2) {
+  const R = 6371, dL = (la2-la1)*Math.PI/180, dN = (ln2-ln1)*Math.PI/180;
+  const a = Math.sin(dL/2)**2 + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dN/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+/* ── RATE LIMITER (client-side) ── */
+// Previne spam de cadastro: máx 3 submissões por hora por dispositivo
+const RATE_KEY = 'edena_submissions';
+function checkRateLimit() {
+  const now = Date.now();
+  const ONE_HOUR = 60 * 60 * 1000;
+  const raw = JSON.parse(localStorage.getItem(RATE_KEY) || '[]');
+  // Mantém só os do último 1h
+  const recent = raw.filter(t => now - t < ONE_HOUR);
+  if (recent.length >= 3) {
+    const wait = Math.ceil((ONE_HOUR - (now - recent[0])) / 60000);
+    showToast(`⚠️ Limite atingido. Tente novamente em ${wait} min.`);
+    return false;
+  }
+  recent.push(now);
+  localStorage.setItem(RATE_KEY, JSON.stringify(recent));
+  return true;
+}
+
+/* ── DETECTOR DE DUPLICATAS ── */
+async function verificarDuplicata(nome, cidade) {
+  const normalizar = s => s.toLowerCase().trim().normalize('NFD').replace(/\p{Diacritic}/gu,'');
+  const nomNorm = normalizar(nome);
+  const cid = normalizar(cidade);
+  return RESTAURANTES.some(r =>
+    normalizar(r.nome) === nomNorm && normalizar(r.cidade) === cid
+  );
+}
 
 /* ── FIRESTORE LOAD ── */
 async function carregarRestaurantes() {
+  mostrarSkeleton();
   try {
     const snap = await getDocs(query(collection(db,'restaurantes'), orderBy('criadoEm','desc')));
     const remote = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    // Mantém seed + adiciona novos do Firestore que não estejam no seed
     const seedIds = new Set(SEED.map(s => s.id));
     const novos   = remote.filter(r => !seedIds.has(r.id));
     RESTAURANTES  = [...SEED, ...novos];
@@ -771,6 +1255,31 @@ async function carregarRestaurantes() {
   }
   atualizarStats();
   filterAll();
+}
+
+/* ── ROLE DO USUÁRIO ── */
+async function carregarRole(uid) {
+  try {
+    const { getDoc, doc: fsDoc } = await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
+    const snap = await getDoc(fsDoc(db, 'usuarios', uid));
+    currentUserRole = snap.exists() ? (snap.data().role || 'user') : 'user';
+  } catch { currentUserRole = 'user'; }
+  atualizarUIRole();
+}
+
+function atualizarUIRole() {
+  const badge = document.getElementById('role-badge');
+  if (!badge) return;
+  const labels = { admin:'👑 Admin', restaurante:'🍽️ Dono', user:'' };
+  badge.textContent = labels[currentUserRole] || '';
+  badge.style.display = currentUserRole !== 'user' ? 'inline' : 'none';
+  atualizarBtnPainel();
+}
+
+function atualizarBtnPainel() {
+  const btn = document.getElementById('btn-painel');
+  if (!btn) return;
+  btn.style.display = (currentUserRole === 'restaurante' || currentUserRole === 'admin') ? '' : 'none';
 }
 
 function atualizarStats(){
@@ -788,9 +1297,13 @@ onAuthStateChanged(auth, user => {
     document.getElementById('user-name-text').textContent =
       (user.displayName || user.email || '').split(' ')[0];
     be.style.display = 'none';
+    carregarRole(user.uid); // carrega role do Firestore
+    atualizarBtnPainel();
   } else {
     ud.style.display = 'none';
     be.style.display = '';
+    currentUserRole = 'user';
+    atualizarUIRole();
   }
 });
 
@@ -803,6 +1316,7 @@ window.loginGoogle = async () => {
     await signInWithPopup(auth, gp);
     fecharLogin();
     showToast('✅ Login realizado com sucesso!');
+    logEvento('login', { method: 'google' });
   } catch(e) {
     document.getElementById('login-error').textContent = 'Erro no login com Google. Tente novamente.';
   }
@@ -814,11 +1328,13 @@ window.loginEmail = async () => {
   const errEl  = document.getElementById('login-error');
   errEl.textContent = '';
   if (!email || !senha) { errEl.textContent = 'Preencha e-mail e senha.'; return; }
+  if (!isValidEmail(email)) { errEl.textContent = 'E-mail inválido.'; return; }
   if (senha.length < 6)  { errEl.textContent = 'Senha deve ter ao menos 6 caracteres.'; return; }
   try {
     await signInWithEmailAndPassword(auth, email, senha);
     fecharLogin();
     showToast('✅ Login realizado!');
+    logEvento('login', { method: 'email' });
   } catch {
     try {
       await createUserWithEmailAndPassword(auth, email, senha);
@@ -876,7 +1392,60 @@ window.syncCidades = source => {
 };
 
 /* ── FILTRO PRINCIPAL ── */
+function mostrarSkeleton() {
+  const cont = document.getElementById('cards-container');
+  cont.className = 'skel-wrap';
+  cont.innerHTML = Array(6).fill(0).map(()=>`
+    <div class="skel-card">
+      <div class="skel-img"></div>
+      <div class="skel-body">
+        <div class="skel-line wide"></div>
+        <div class="skel-line short"></div>
+        <div style="display:flex;gap:6px">
+          <div class="skel-line xshort"></div>
+          <div class="skel-line xshort"></div>
+        </div>
+        <div class="skel-line" style="width:60%;margin-top:4px"></div>
+      </div>
+    </div>`).join('');
+}
+
+function atualizarBadgeFiltros() {
+  let count = 0;
+  if (document.getElementById('tog-delivery').checked) count++;
+  if (document.getElementById('tog-aberto').checked)   count++;
+  if (document.getElementById('tog-acessivel').checked)count++;
+  if (document.getElementById('tog-gluten').checked)   count++;
+  if (document.getElementById('tog-promo').checked)    count++;
+  if (priceFilter) count++;
+  if (ratingFilter > 0) count++;
+  const badge = document.getElementById('filter-badge');
+  if (badge) {
+    badge.textContent = count || '';
+    badge.classList.toggle('show', count > 0);
+  }
+}
+
 window.filterAll = function() {
+  // Persiste estado dos filtros no localStorage
+  try {
+    const estado = {
+      q:       document.getElementById('main-search').value,
+      cidade:  document.getElementById('hero-cidade').value,
+      preco:   priceFilter,
+      rating:  ratingFilter,
+      delivery:document.getElementById('tog-delivery').checked,
+      aberto:  document.getElementById('tog-aberto').checked,
+      acess:   document.getElementById('tog-acessivel').checked,
+      gluten:  document.getElementById('tog-gluten').checked,
+      promo:   document.getElementById('tog-promo').checked,
+      pill:    currentPill,
+      sort:    document.getElementById('sort-sel').value,
+      view:    currentView
+    };
+    sessionStorage.setItem('edena_filtros', JSON.stringify(estado));
+  } catch {}
+
   const q       = document.getElementById('main-search').value.toLowerCase().trim();
   const cidade  = document.getElementById('hero-cidade').value;
   const bairro  = document.getElementById('side-bairro').value;
@@ -929,6 +1498,8 @@ window.filterAll = function() {
     }));
   }
 
+  atualizarBadgeFiltros();
+
   list.sort((a,b) => {
     if (sort === 'rating')    return b.rating - a.rating;
     if (sort === 'nome')      return a.nome.localeCompare(b.nome, 'pt-BR');
@@ -947,6 +1518,7 @@ window.filterAll = function() {
   if (currentPage > totalPages && totalPages > 0) currentPage = 1;
   renderCards(list.slice((currentPage-1)*PER_PAGE, currentPage*PER_PAGE));
   renderPagination(totalPages);
+  limparWillChange();
 };
 
 /* ── RENDER CARDS ── */
@@ -958,7 +1530,8 @@ function renderCards(list) {
     cont.innerHTML = `<div class="empty-state">
       <div class="empty-icon">🌱</div>
       <div class="empty-title">Nenhum resultado encontrado</div>
-      <p class="empty-sub">Tente ajustar os filtros ou busque por outra localidade</p>
+      <p class="empty-sub">Tente ajustar os filtros ou busque em outra localidade</p>
+      <button onclick="resetFilters()" style="margin-top:16px;padding:10px 20px;border-radius:var(--radius-pill);border:1.5px solid var(--eden-300);background:var(--eden-50);color:var(--eden-700);font-size:13px;font-weight:600;cursor:pointer">Limpar filtros</button>
     </div>`;
     return;
   }
@@ -969,8 +1542,9 @@ function renderCards(list) {
     const listCls  = currentView === 'list' ? ' rest-card-list' : '';
     const distBadge = (r._dist != null)
       ? `<span class="card-dist">📍 ${r._dist.toFixed(1)} km</span>` : '';
+    // Lazy load: usa data-src + IntersectionObserver para não carregar imgs fora do viewport
     const fotoEl   = r.fotoUrl
-      ? `<img class="card-photo" src="${esc(r.fotoUrl)}" alt="${esc(r.nome)}" loading="lazy">` : '';
+      ? `<img class="card-photo lazy-img" data-src="${esc(r.fotoUrl)}" alt="${esc(r.nome)}" loading="lazy" style="opacity:0;transition:opacity .3s">` : '';
     return `
     <div class="rest-card${listCls}" style="animation-delay:${delay}s" data-id="${esc(r.id)}" role="button" tabindex="0" aria-label="${esc(r.nome)}">
       <div class="card-img-wrap">
@@ -989,7 +1563,7 @@ function renderCards(list) {
       </div>
       <div class="card-body">
         <div class="card-top">
-          <div class="card-name">${esc(r.nome)}</div>
+          <div class="card-name">${esc(r.nome)}${getBadgePro(r)}</div>
           ${r.rating ? `<div class="card-rating"><span class="star" aria-hidden="true">★</span><span class="num">${esc(r.rating)}</span></div>` : ''}
         </div>
         <div class="card-tipo">
@@ -1013,6 +1587,8 @@ function renderCards(list) {
   cont.querySelectorAll('.card-fav').forEach(btn => {
     btn.addEventListener('click', e => { e.stopPropagation(); toggleFav(e, btn.dataset.fav); });
   });
+  // Lazy load: ativa IntersectionObserver nas imagens recém-renderizadas
+  ativarLazyImages(cont);
 }
 
 /* ── PAGINAÇÃO ── */
@@ -1045,7 +1621,12 @@ window.setCity  = (b,c)  => { document.querySelectorAll('.location-pill').forEac
 window.onSearchInput = () => {
   document.getElementById('search-clear').style.display = document.getElementById('main-search').value ? 'flex' : 'none';
   clearTimeout(searchDebounce);
-  searchDebounce = setTimeout(() => { currentPage=1; filterAll(); }, 280);
+  searchDebounce = setTimeout(() => {
+    currentPage=1;
+    filterAll();
+    const q = document.getElementById('main-search').value.trim();
+    if (q.length > 2) logEvento('search', { search_term: q });
+  }, 280);
 };
 window.clearSearch = () => { document.getElementById('main-search').value=''; document.getElementById('search-clear').style.display='none'; currentPage=1; filterAll(); };
 window.resetFilters = () => {
@@ -1056,6 +1637,7 @@ window.resetFilters = () => {
   document.querySelectorAll('.price-btn').forEach(b=>b.classList.toggle('active',b.dataset.val===''));
   document.querySelector('.rating-slider').value=0;
   document.getElementById('rating-val').textContent='Qualquer';
+  try { sessionStorage.removeItem('edena_filtros'); } catch {}
   currentPage=1; filterAll();
 };
 
@@ -1077,6 +1659,7 @@ function toggleFav(e, id) {
 window.openModal = id => {
   const r = RESTAURANTES.find(x => String(x.id) === String(id));
   if (!r) return;
+  logEvento('view_restaurant', { restaurant_id: r.id, name: r.nome, city: r.cidade, type: r.tipo });
 
   const pratosHTML = (r.pratos||[]).map(p => `
     <div class="menu-item">
@@ -1118,8 +1701,8 @@ window.openModal = id => {
       </div>
       ${pratosHTML ? `<div class="modal-section-title">Cardápio em destaque</div><div class="menu-items">${pratosHTML}</div>` : ''}
       <div class="modal-action-btns">
-        ${wppTel ? `<a href="https://wa.me/55${wppTel}" target="_blank" rel="noopener" class="btn-ver-site" style="background:linear-gradient(135deg,#25d366,#128c7e);text-decoration:none;display:block;text-align:center">💬 Chamar no WhatsApp</a>` : ''}
-        <a href="${mapsUrl}" target="_blank" rel="noopener" class="modal-map-btn">🗺️ Ver no Google Maps</a>
+        ${wppTel ? `<a href="https://wa.me/55${wppTel}" target="_blank" rel="noopener" class="btn-ver-site" style="background:linear-gradient(135deg,#25d366,#128c7e);text-decoration:none;display:block;text-align:center" onclick="logEvento('whatsapp_click',{restaurant_id:'${esc(r.id)}',name:'${esc(r.nome)}'})">💬 Chamar no WhatsApp</a>` : ''}
+        <a href="${mapsUrl}" target="_blank" rel="noopener" class="modal-map-btn" onclick="logEvento('maps_click',{restaurant_id:'${esc(r.id)}',name:'${esc(r.nome)}'})">🗺️ Ver no Google Maps</a>
         ${r.telefone ? `<a href="tel:${esc(r.telefone)}" class="modal-tel-btn">📞 Ligar: ${esc(r.telefone)}</a>` : ''}
       </div>
     </div>`;
@@ -1128,6 +1711,13 @@ window.openModal = id => {
     btn.addEventListener('click', () => showToast('✅ Pedido enviado para '+r.nome+'!'));
   });
 
+  // Share button
+  const shareBtn = document.getElementById('modal-share-btn');
+  if (shareBtn) {
+    shareBtn.onclick = () => compartilharRestaurante(r);
+  }
+
+  window._modalRestaurante = r; // guarda referência para o painel
   document.getElementById('modal-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
 };
@@ -1154,31 +1744,62 @@ window.abrirMapa = () => {
     }
     leafletMap.invalidateSize();
 
-    // Remove marcadores antigos
+    // Remove camadas antigas (cluster + marcador usuário)
     leafletMarkers.forEach(m => m.remove());
     leafletMarkers = [];
+    if (leafletMap._clusterGroup) {
+      leafletMap.removeLayer(leafletMap._clusterGroup);
+    }
 
     const comCoordenadas = RESTAURANTES.filter(r => r.lat && r.lng);
     document.getElementById('map-count-label').textContent =
       comCoordenadas.length + ' restaurante' + (comCoordenadas.length!==1?'s':'') + ' no mapa';
 
+    // Cluster group para agrupar pins próximos automaticamente
+    const cluster = L.markerClusterGroup({
+      iconCreateFunction: c => L.divIcon({
+        html: `<div style="background:#1e4a22;color:#fff;border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.35);border:2px solid #fff">${c.getChildCount()}</div>`,
+        className: '', iconSize: [38,38]
+      })
+    });
+    leafletMap._clusterGroup = cluster;
+
     comCoordenadas.forEach(r => {
-      // FIX: usa string de cor diretamente, sem cssVar() dentro do icon html
-      const iconHtml = `<div style="background:#1e4a22;color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 10px rgba(0,0,0,.35);border:2px solid #fff">${r.emoji||'🌿'}</div>`;
+      const iconHtml = `<div style="background:${r.promo?'#e05a2b':'#1e4a22'};color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 10px rgba(0,0,0,.35);border:2px solid #fff" title="${r.nome}">${r.emoji||'🌿'}</div>`;
       const icon = L.divIcon({ html: iconHtml, className:'', iconSize:[36,36], iconAnchor:[18,18] });
+      const distStr = (userLat !== null && r.lat && r.lng)
+        ? ` · ${haversine(userLat, userLng, r.lat, r.lng).toFixed(1)} km` : '';
       const marker = L.marker([r.lat, r.lng], { icon })
-        .addTo(leafletMap)
-        .bindPopup(`<b>${r.nome}</b><br><span style="color:#555">${r.tipo}</span><br>${r.cidade}${r.promo?'<br><b style="color:#e05a2b">🔥 Em promoção</b>':''}<br><small>★ ${r.rating||'—'} · ${r.preco}</small>`);
-      marker.on('click', () => { fecharMapa(); setTimeout(() => openModal(r.id), 200); });
-      leafletMarkers.push(marker);
+        .bindPopup(`
+          <div style="min-width:160px">
+            <b style="font-size:14px">${r.nome}</b><br>
+            <span style="color:#555;font-size:12px">${r.tipo}</span><br>
+            <span style="font-size:12px">${r.cidade}${distStr}</span>
+            ${r.promo ? '<br><b style="color:#e05a2b">🔥 Em promoção</b>' : ''}
+            <br><small>★ ${r.rating||'—'} · ${r.preco}</small><br>
+            <button onclick="fecharMapa();setTimeout(()=>openModal('${r.id}'),200)"
+              style="margin-top:6px;padding:5px 12px;background:#1e4a22;color:#fff;border:none;border-radius:999px;cursor:pointer;font-size:12px;font-weight:600;width:100%">
+              Ver detalhes →
+            </button>
+          </div>`);
+      cluster.addLayer(marker);
     });
 
-    // Marcador do usuário
+    leafletMap.addLayer(cluster);
+
+    // Marcador do usuário (ponto azul, fora do cluster)
     if (userLat !== null) {
-      const userIcon = L.divIcon({ html:'<div style="background:#4aa857;border:3px solid #fff;border-radius:50%;width:16px;height:16px;box-shadow:0 0 0 4px rgba(74,168,87,.3)"></div>', className:'', iconSize:[16,16], iconAnchor:[8,8] });
-      const um = L.marker([userLat, userLng], { icon: userIcon }).addTo(leafletMap).bindPopup('📍 Você está aqui');
+      const userIcon = L.divIcon({
+        html:'<div style="background:#4aa857;border:3px solid #fff;border-radius:50%;width:16px;height:16px;box-shadow:0 0 0 6px rgba(74,168,87,.25)"></div>',
+        className:'', iconSize:[16,16], iconAnchor:[8,8]
+      });
+      const um = L.marker([userLat, userLng], { icon: userIcon })
+        .addTo(leafletMap).bindPopup('<b>📍 Você está aqui</b>');
       leafletMarkers.push(um);
       leafletMap.setView([userLat, userLng], 13);
+    } else if (comCoordenadas.length > 0) {
+      // Centraliza no centro do ES
+      leafletMap.setView([-20.3, -40.3], 10);
     }
   }, 120);
 };
@@ -1219,8 +1840,30 @@ window.previewImagem = inp => {
   prev.style.display = 'block';
 };
 
+/*
+ * ARQUITETURA RECOMENDADA — Cloud Functions (Firebase):
+ *
+ * Em produção, substitua o addDoc() direto por uma chamada HTTP:
+ *
+ *   POST https://us-central1-vegmap-21101.cloudfunctions.net/cadastrarRestaurante
+ *   Body: { nome, cidade, tipo, ... }
+ *   Auth: Bearer <idToken>
+ *
+ * A Cloud Function valida server-side, aplica rate limit real por IP,
+ * checa duplicatas no Firestore, e só aí persiste o documento.
+ * Isso remove a dependência das Firestore Security Rules para lógica de negócio.
+ *
+ * Exemplo de Function (Node.js):
+ *   exports.cadastrarRestaurante = functions.https.onCall(async (data, context) => {
+ *     if (!context.auth) throw new functions.https.HttpsError('unauthenticated', '...');
+ *     // validação, sanitização, dedup, addDoc...
+ *   });
+ */
 window.salvarRestaurante = async () => {
-  // Validação com feedback visual
+  // 1. Rate limiting client-side
+  if (!checkRateLimit()) return;
+
+  // 2. Validação com feedback visual
   const campos = {
     'cad-nome':   document.getElementById('cad-nome').value.trim(),
     'cad-cidade': document.getElementById('cad-cidade').value,
@@ -1233,6 +1876,21 @@ window.salvarRestaurante = async () => {
     else        el.classList.remove('error');
   });
   if (!ok) { showToast('⚠️ Preencha os campos obrigatórios (*)'); return; }
+
+  // 3. Verifica comprimento mínimo do nome
+  if (campos['cad-nome'].length < 3) {
+    document.getElementById('cad-nome').classList.add('error');
+    showToast('⚠️ Nome muito curto (mínimo 3 caracteres)'); return;
+  }
+
+  // 4. Detecta duplicata
+  const isDuplicate = await verificarDuplicata(campos['cad-nome'], campos['cad-cidade']);
+  if (isDuplicate) {
+    showToast('⚠️ Já existe um estabelecimento com este nome nesta cidade!');
+    document.getElementById('cad-status').textContent = '⚠️ Possível duplicata detectada.';
+    document.getElementById('cad-status').style.color = '#b45309';
+    return;
+  }
 
   const btn    = document.getElementById('btn-salvar');
   const status = document.getElementById('cad-status');
@@ -1257,15 +1915,19 @@ window.salvarRestaurante = async () => {
       ? [...new Set(tagsRaw.split(',').map(t=>t.trim().toLowerCase()).filter(Boolean))]
       : ['vegano'];
 
+    // Sanitiza todos os campos antes de salvar
+    const telefoneRaw = document.getElementById('cad-tel').value;
+    const telefoneLimpo = telefoneRaw.replace(/[^\d\s()\-+]/g, '').trim().slice(0,20);
+
     const doc = {
-      nome:     campos['cad-nome'],
-      cidade:   campos['cad-cidade'],
-      tipo:     campos['cad-tipo'],
-      bairro:   document.getElementById('cad-bairro').value.trim(),
-      preco:    document.getElementById('cad-preco').value,
-      telefone: document.getElementById('cad-tel').value.trim(),
-      horario:  document.getElementById('cad-horario').value.trim(),
-      descricao:document.getElementById('cad-desc').value.trim(),
+      nome:     sanitize(campos['cad-nome'], 100),
+      cidade:   campos['cad-cidade'],   // enum controlado pelo select
+      tipo:     sanitize(campos['cad-tipo'], 80),
+      bairro:   sanitize(document.getElementById('cad-bairro').value, 60),
+      preco:    document.getElementById('cad-preco').value,  // enum $|$$|$$$
+      telefone: telefoneLimpo,
+      horario:  sanitize(document.getElementById('cad-horario').value, 60),
+      descricao:sanitize(document.getElementById('cad-desc').value, 400),
       delivery: document.getElementById('cad-delivery').checked,
       acessivel:document.getElementById('cad-acessivel').checked,
       semgluten:document.getElementById('cad-gluten').checked,
@@ -1275,17 +1937,34 @@ window.salvarRestaurante = async () => {
       aberto:false, novo:true, destaque:false, promo:false, pratos:[],
       donoId:    auth.currentUser.uid,
       donoEmail: auth.currentUser.email,
+      role:      'restaurante',   // papel deste usuário
       criadoEm:  serverTimestamp()
     };
 
     status.textContent = '💾 Salvando no banco de dados…';
     const ref = await addDoc(collection(db,'restaurantes'), doc);
     RESTAURANTES.push({ id: ref.id, ...doc });
+
+    // Atualiza role do usuário para 'restaurante' na coleção /usuarios/{uid}
+    try {
+      const { setDoc, doc: fsDoc } = await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
+      await setDoc(fsDoc(db, 'usuarios', auth.currentUser.uid), {
+        role: 'restaurante',
+        email: auth.currentUser.email,
+        atualizadoEm: serverTimestamp()
+      }, { merge: true });
+      currentUserRole = 'restaurante';
+      atualizarUIRole();
+    } catch(roleErr) {
+      console.warn('Não foi possível salvar role:', roleErr.message);
+    }
+
     atualizarStats();
     filterAll();
 
     status.style.color = 'var(--eden-600)';
     status.textContent = '✅ Cadastrado com sucesso!';
+    logEvento('restaurant_registered', { city: doc.cidade, type: doc.tipo });
     showToast('🎉 Estabelecimento cadastrado com sucesso!');
     setTimeout(fecharCadastro, 1800);
   } catch(e) {
@@ -1316,12 +1995,483 @@ window.showToast = msg => {
 /* ── TECLADO ── */
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    closeModal(); fecharMapa(); fecharCadastro(); fecharLogin();
+    closeModal(); fecharMapa(); fecharCadastro(); fecharLogin(); fecharPlanos();
   }
 });
 
+/* ── COMPARTILHAR ── */
+window.compartilharRestaurante = async (r) => {
+  if (!r) { showToast('⚠️ Nenhum restaurante selecionado'); return; }
+  const url  = `${location.origin}${location.pathname}?r=${encodeURIComponent(r.id)}`;
+  const text = `🌿 ${r.nome} — ${r.tipo} em ${r.cidade}`;
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'EDENA — ' + r.nome, text, url });
+      return;
+    } catch {}
+  }
+  // Fallback: copia para clipboard
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast('📋 Link copiado para a área de transferência!');
+  } catch {
+    showToast('🔗 ' + url);
+  }
+};
+
+/* ── ABRIR RESTAURANTE PELA URL ── */
+function abrirRestauranteDaURL() {
+  const params = new URLSearchParams(location.search);
+  const rid = params.get('r');
+  if (rid) {
+    // Aguarda restaurantes carregarem
+    const tentar = (n=0) => {
+      const r = RESTAURANTES.find(x => String(x.id) === String(rid));
+      if (r) { openModal(r.id); return; }
+      if (n < 10) setTimeout(() => tentar(n+1), 300);
+    };
+    tentar();
+  }
+}
+
+/* ── PAINEL DO DONO ── */
+let meusRestaurantes = [];
+
+window.abrirPainel = async () => {
+  if (!auth.currentUser) { abrirLogin(); return; }
+  document.getElementById('painel-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  await carregarMeusRestaurantes();
+};
+
+window.fecharPainel = () => {
+  document.getElementById('painel-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+};
+
+async function carregarMeusRestaurantes() {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  const listEl = document.getElementById('meus-restaurantes-list');
+
+  // Busca do estado local primeiro (imediato)
+  meusRestaurantes = RESTAURANTES.filter(r => r.donoId === uid);
+
+  if (meusRestaurantes.length === 0) {
+    // Tenta buscar do Firestore
+    try {
+      const { query: fsQuery, where, getDocs: fsGetDocs, collection: fsCol } =
+        await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
+      const snap = await fsGetDocs(fsQuery(fsCol(db,'restaurantes'), where('donoId','==',uid)));
+      meusRestaurantes = snap.docs.map(d => ({id:d.id,...d.data()}));
+    } catch(e) { console.warn(e); }
+  }
+
+  if (meusRestaurantes.length === 0) {
+    listEl.innerHTML = `<div style="text-align:center;padding:24px;color:var(--muted);font-size:14px">
+      <div style="font-size:40px;margin-bottom:8px">🌿</div>
+      Você ainda não cadastrou nenhum estabelecimento.<br>
+      <button onclick="fecharPainel();abrirCadastro()" style="margin-top:12px;padding:9px 18px;border-radius:var(--radius-pill);border:none;background:var(--eden-700);color:#fff;font-size:13px;font-weight:600;cursor:pointer">Cadastrar agora →</button>
+    </div>`;
+    document.getElementById('promo-section').style.display = 'none';
+    return;
+  }
+
+  listEl.innerHTML = meusRestaurantes.map(r => `
+    <div class="meu-rest-card" onclick="fecharPainel();openModal('${esc(r.id)}')">
+      <div class="meu-rest-emoji">${esc(r.emoji||'🌿')}</div>
+      <div class="meu-rest-info">
+        <div class="meu-rest-nome">${esc(r.nome)}</div>
+        <div class="meu-rest-sub">${esc(r.cidade)}${r.bairro?', '+esc(r.bairro):''}</div>
+        <div class="meu-rest-status">
+          <span class="status-pill status-ativo">✅ Ativo</span>
+          ${r.promo?'<span class="status-pill" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a">🔥 Em promoção</span>':''}
+          ${r.aberto?'<span class="status-pill" style="background:var(--eden-50);color:var(--eden-700);border:1px solid var(--eden-200)">🟢 Aberto</span>':'<span class="status-pill" style="background:#fef2f2;color:#991b1b;border:1px solid #fecaca">🔴 Fechado</span>'}
+        </div>
+      </div>
+    </div>`).join('');
+
+  // Exibe seção de promoção para o primeiro restaurante
+  const primeiro = meusRestaurantes[0];
+  document.getElementById('promo-section').style.display = 'block';
+  document.getElementById('tog-promo-ativo').checked = !!primeiro.promo;
+
+  // Stats simuladas (futuramente virão do Firestore)
+  document.getElementById('ps-views').textContent = Math.floor(Math.random()*80+20);
+  document.getElementById('ps-favs').textContent  = Math.floor(Math.random()*15+3);
+  document.getElementById('ps-wpp').textContent   = Math.floor(Math.random()*12+1);
+  document.getElementById('ps-maps').textContent  = Math.floor(Math.random()*18+2);
+
+  // Botão aberto/fechado
+  const btnAberto = document.getElementById('btn-toggle-aberto');
+  const aberto = !!primeiro.aberto;
+  document.getElementById('aberto-icon').textContent  = aberto ? '🔴' : '🟢';
+  document.getElementById('aberto-label').textContent = aberto ? 'Marcar como fechado' : 'Marcar como aberto agora';
+  btnAberto.onclick = () => toggleAberto(primeiro);
+}
+
+async function toggleAberto(r) {
+  try {
+    const { updateDoc, doc: fsDoc } =
+      await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
+    const novoAberto = !r.aberto;
+    if (!r.id.startsWith('s')) { // não atualiza seed data
+      await updateDoc(fsDoc(db,'restaurantes',r.id), { aberto: novoAberto });
+    }
+    // Atualiza local
+    const idx = RESTAURANTES.findIndex(x=>x.id===r.id);
+    if (idx >= 0) RESTAURANTES[idx].aberto = novoAberto;
+    r.aberto = novoAberto;
+    showToast(novoAberto ? '🟢 Marcado como aberto!' : '🔴 Marcado como fechado!');
+    filterAll();
+    carregarMeusRestaurantes();
+  } catch(e) { showToast('❌ Erro ao atualizar: ' + e.message); }
+}
+
+window.togglePromoRestaurante = async (inp) => {
+  const r = meusRestaurantes[0];
+  if (!r) return;
+  const novoPromo = inp.checked;
+  try {
+    const { updateDoc, doc: fsDoc } =
+      await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
+    if (!r.id.startsWith('s')) {
+      await updateDoc(fsDoc(db,'restaurantes',r.id), { promo: novoPromo });
+    }
+    const idx = RESTAURANTES.findIndex(x=>x.id===r.id);
+    if (idx >= 0) RESTAURANTES[idx].promo = novoPromo;
+    r.promo = novoPromo;
+    showToast(novoPromo ? '🔥 Promoção ativada! Badge aparece na busca.' : '✅ Promoção desativada.');
+    filterAll();
+  } catch(e) { showToast('❌ Erro: ' + e.message); inp.checked = !novoPromo; }
+};
+
+/* ── PWA: MANIFEST DINÂMICO + SERVICE WORKER ── */
+function setupPWA() {
+  // Manifest inline via Blob (não precisa de arquivo externo)
+  const manifest = {
+    name: 'EDENA — Veganos do ES',
+    short_name: 'EDENA',
+    description: 'Encontre restaurantes veganos no Espírito Santo',
+    start_url: location.pathname,
+    display: 'standalone',
+    background_color: '#f8f8f6',
+    theme_color: '#1e4a22',
+    orientation: 'portrait-primary',
+    icons: [
+      { src: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%231e4a22"/><text y=".9em" font-size="80" x="10">🌿</text></svg>', sizes: '192x192', type: 'image/svg+xml' },
+      { src: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%231e4a22"/><text y=".9em" font-size="80" x="10">🌿</text></svg>', sizes: '512x512', type: 'image/svg+xml' }
+    ]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], {type:'application/manifest+json'});
+  const url  = URL.createObjectURL(blob);
+  const link = document.getElementById('pwa-manifest');
+  if (link) link.href = url;
+
+  // Service Worker
+  if ('serviceWorker' in navigator) {
+    const swCode = `
+const CACHE = 'edena-v1';
+const STATIC = [location.pathname];
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC).catch(()=>{})));
+  self.skipWaiting();
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys =>
+    Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))
+  ));
+  self.clients.claim();
+});
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+  if (e.request.url.includes('firestore') || e.request.url.includes('googleapis')) return;
+  e.respondWith(
+    fetch(e.request).catch(() => caches.match(e.request))
+  );
+});`;
+    const swBlob = new Blob([swCode], {type:'application/javascript'});
+    const swUrl  = URL.createObjectURL(swBlob);
+    navigator.serviceWorker.register(swUrl, {scope:'/'})
+      .catch(()=>{}); // silencia erros de scope
+  }
+}
+
+/* ── BANNER INSTALAR PWA ── */
+let _deferredInstall = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _deferredInstall = e;
+  const banner = document.getElementById('install-banner');
+  if (banner && !sessionStorage.getItem('edena_install_dismissed')) {
+    setTimeout(() => banner.classList.add('show'), 3000);
+  }
+});
+
+document.getElementById('btn-instalar-pwa')?.addEventListener('click', async () => {
+  if (!_deferredInstall) return;
+  _deferredInstall.prompt();
+  const { outcome } = await _deferredInstall.userChoice;
+  _deferredInstall = null;
+  document.getElementById('install-banner').classList.remove('show');
+  if (outcome === 'accepted') showToast('🎉 EDENA instalado com sucesso!');
+});
+
+document.getElementById('btn-dismiss-install')?.addEventListener('click', () => {
+  sessionStorage.setItem('edena_install_dismissed', '1');
+  document.getElementById('install-banner').classList.remove('show');
+});
+
+/* ── OFFLINE / ONLINE DETECTION ── */
+function setupOfflineDetection() {
+  const banner = document.getElementById('offline-banner');
+  const update = () => {
+    if (banner) banner.classList.toggle('show', !navigator.onLine);
+    if (!navigator.onLine) showToast('📡 Você está offline — exibindo dados locais');
+    if (navigator.onLine)  filterAll(); // recarrega quando volta
+  };
+  window.addEventListener('offline', update);
+  window.addEventListener('online',  update);
+  update();
+}
+
+/* ── SCROLL TO TOP ── */
+function setupScrollTop() {
+  const btn = document.getElementById('scroll-top');
+  if (!btn) return;
+  window.addEventListener('scroll', () => {
+    btn.classList.toggle('show', window.scrollY > 400);
+  }, { passive: true });
+}
+
+/* ══════════════════════════════════════════════
+   PERFORMANCE
+══════════════════════════════════════════════ */
+
+/* ── LAZY IMAGES com IntersectionObserver ── */
+let _lazyObserver = null;
+function ativarLazyImages(container) {
+  const imgs = container.querySelectorAll('img.lazy-img[data-src]');
+  if (!imgs.length) return;
+
+  if (!_lazyObserver) {
+    _lazyObserver = new IntersectionObserver((entries, obs) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const img = entry.target;
+        img.src = img.dataset.src;
+        img.onload  = () => { img.style.opacity='1'; img.classList.remove('lazy-img'); };
+        img.onerror = () => { img.style.display='none'; };
+        obs.unobserve(img);
+      });
+    }, { rootMargin:'200px 0px', threshold:0 }); // pré-carrega 200px antes de entrar na tela
+  }
+  imgs.forEach(img => _lazyObserver.observe(img));
+}
+
+/* ── DEBOUNCE REFORÇADO: 350ms + cancela se usuário ainda digita ── */
+// (o debounce de 280ms da busca já existe; aqui protegemos filterAll de chamadas em cascata)
+let _filterScheduled = false;
+const _origFilterAll = window.filterAll;
+window.filterAll = function() {
+  if (_filterScheduled) return; // evita execuções em cascata no mesmo tick
+  _filterScheduled = true;
+  requestAnimationFrame(() => {
+    _origFilterAll();
+    _filterScheduled = false;
+  });
+};
+
+/* ── WILL-CHANGE CLEANUP: libera GPU após animação de entrada dos cards ── */
+function limparWillChange() {
+  setTimeout(() => {
+    document.querySelectorAll('.rest-card').forEach(c => c.style.willChange='auto');
+  }, 600);
+}
+
+/* ── DETECTA DISPOSITIVO FRACO (heurística) ── */
+const isLowEnd = (() => {
+  const mem  = navigator.deviceMemory; // GB de RAM (Chrome)
+  const cpus = navigator.hardwareConcurrency; // núcleos lógicos
+  return (mem && mem <= 2) || (cpus && cpus <= 2);
+})();
+if (isLowEnd) {
+  document.documentElement.classList.add('low-end');
+}
+// CSS: .low-end * { animation: none !important; transition-duration: .05s !important; }
+
+/* ── BUSCAR COM FEEDBACK VISUAL ── */
+window.buscarComFeedback = () => {
+  const btn = document.getElementById('btn-buscar-main');
+  if (!btn) { filterAll(); return; }
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle"></span>';
+  mostrarSkeleton();
+  setTimeout(() => {
+    filterAll();
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }, 350); // animação mínima para dar feedback mesmo em dados locais
+};
+
+/* ══════════════════════════════════════════════
+   MONETIZAÇÃO
+══════════════════════════════════════════════ */
+
+/*
+ * FIRESTORE SECURITY RULES v2 — Produção
+ * ═══════════════════════════════════════
+ * Cole no Firebase Console → Firestore → Regras:
+ *
+ * rules_version = '2';
+ * service cloud.firestore {
+ *   match /databases/{database}/documents {
+ *
+ *     function isAuth()  { return request.auth != null; }
+ *     function isOwner() { return resource.data.donoId == request.auth.uid; }
+ *     function isPro()   {
+ *       return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.plano == 'pro';
+ *     }
+ *     function validRestaurant() {
+ *       let d = request.resource.data;
+ *       return d.nome is string && d.nome.size() >= 3 && d.nome.size() <= 100
+ *           && d.cidade is string && d.tipo is string
+ *           && d.donoId == request.auth.uid
+ *           && d.destaque == false   // só admin/sistema ativa destaque
+ *           && d.criadoEm == request.time;
+ *     }
+ *
+ *     match /restaurantes/{id} {
+ *       allow read:   if true;
+ *       allow create: if isAuth() && validRestaurant();
+ *       allow update: if isAuth() && isOwner()
+ *                     && !('destaque' in request.resource.data.diff(resource.data).affectedKeys());
+ *       // destaque só pode ser alterado por admin via Cloud Function
+ *       allow delete: if isAuth() && isOwner();
+ *     }
+ *
+ *     match /usuarios/{uid} {
+ *       allow read:  if isAuth() && request.auth.uid == uid;
+ *       allow write: if isAuth() && request.auth.uid == uid
+ *                    && !('plano' in request.resource.data)  // plano só via Cloud Function (pagamento)
+ *                    && !('role' in request.resource.data);  // role só via Cloud Function
+ *     }
+ *
+ *     // Apenas Cloud Functions com credenciais de admin gravam plano e role
+ *   }
+ * }
+ */
+
+window.abrirPlanos = () => {
+  document.getElementById('planos-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  logEvento('view_plans');
+};
+
+window.fecharPlanos = () => {
+  document.getElementById('planos-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+};
+
+window.assinarPro = async () => {
+  logEvento('click_subscribe_pro');
+  // Aqui você integrará com Stripe / Mercado Pago / Asaas
+  // Por enquanto: redireciona para WhatsApp com mensagem pré-pronta
+  const user  = auth.currentUser;
+  const nome  = user ? (user.displayName || user.email || 'visitante') : 'visitante';
+  const msg   = encodeURIComponent(
+    `Olá! Quero assinar o Plano PRO do EDENA 🌿
+
+Nome: ${nome}
+E-mail: ${user?.email || '—'}`
+  );
+  // Substitua pelo número do seu WhatsApp comercial
+  window.open(`https://wa.me/5527999999999?text=${msg}`, '_blank');
+  showToast('💬 Abrindo WhatsApp para finalizar assinatura…');
+};
+
+/* Mostra badge PRO em cards de destaque */
+function getBadgePro(r) {
+  return r.destaque ? '<span class="badge-pro">PRO</span>' : '';
+}
+
+/* ── RESTAURAR FILTROS DA SESSÃO ── */
+function restaurarFiltros() {
+  try {
+    const raw = sessionStorage.getItem('edena_filtros');
+    if (!raw) return;
+    const e = JSON.parse(raw);
+    if (e.q)      { document.getElementById('main-search').value = e.q; document.getElementById('search-clear').style.display='flex'; }
+    if (e.cidade) { document.getElementById('hero-cidade').value = e.cidade; document.getElementById('side-cidade').value = e.cidade; }
+    if (e.preco)  { priceFilter = e.preco; document.querySelectorAll('.price-btn').forEach(b=>b.classList.toggle('active',b.dataset.val===e.preco)); }
+    if (e.rating) { ratingFilter = e.rating; document.querySelector('.rating-slider').value = e.rating; document.getElementById('rating-val').textContent = e.rating+'+ ★'; }
+    if (e.delivery) document.getElementById('tog-delivery').checked = true;
+    if (e.aberto)   document.getElementById('tog-aberto').checked   = true;
+    if (e.acess)    document.getElementById('tog-acessivel').checked = true;
+    if (e.gluten)   document.getElementById('tog-gluten').checked   = true;
+    if (e.promo)    document.getElementById('tog-promo').checked    = true;
+    if (e.pill) {
+      currentPill = e.pill;
+      document.querySelectorAll('.cat-pill').forEach(b => {
+        const match = b.getAttribute('onclick')?.includes("'"+e.pill+"'");
+        b.classList.toggle('active', match);
+      });
+    }
+    if (e.sort) document.getElementById('sort-sel').value = e.sort;
+    if (e.view) { currentView = e.view; document.querySelectorAll('.view-btn').forEach((b,i)=>b.classList.toggle('active',i===(e.view==='grid'?0:1))); }
+  } catch {}
+}
+
+/* ── AUTOCOMPLETE NA BUSCA ── */
+function setupAutocomplete() {
+  const input = document.getElementById('main-search');
+  if (!input) return;
+
+  const list = document.createElement('div');
+  list.id = 'autocomplete-list';
+  list.style.cssText = 'position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--eden-200);border-top:none;border-radius:0 0 var(--radius-lg) var(--radius-lg);box-shadow:var(--shadow-md);z-index:300;display:none;max-height:240px;overflow-y:auto';
+  input.parentElement.style.position = 'relative';
+  input.parentElement.appendChild(list);
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    if (q.length < 2) { list.style.display='none'; return; }
+
+    // Coleta sugestões únicas: nomes + tipos
+    const sugs = new Map();
+    RESTAURANTES.forEach(r => {
+      if (r.nome.toLowerCase().includes(q))  sugs.set(r.nome, { label: r.nome, sub: r.cidade, icon: r.emoji||'🌿' });
+      if (r.tipo.toLowerCase().includes(q))  sugs.set('_t_'+r.tipo, { label: r.tipo, sub: 'categoria', icon: '🔍' });
+      (r.tags||[]).forEach(t => { if (t.includes(q)) sugs.set('_tag_'+t, { label: t, sub: 'tag', icon: '🏷️' }); });
+    });
+
+    const items = [...sugs.values()].slice(0, 6);
+    if (!items.length) { list.style.display='none'; return; }
+
+    list.innerHTML = items.map(s =>
+      `<div data-label="${esc(s.label)}" style="padding:10px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:14px;border-bottom:1px solid var(--border-light);transition:background .1s" onmouseover="this.style.background='var(--eden-50)'" onmouseout="this.style.background=''" onmousedown="event.preventDefault();document.getElementById('main-search').value='${esc(s.label)}';this.parentElement.style.display='none';filterAll()">
+        <span style="font-size:18px">${esc(s.icon)}</span>
+        <div><div style="font-weight:600">${esc(s.label)}</div><div style="font-size:11px;color:var(--subtle)">${esc(s.sub)}</div></div>
+      </div>`
+    ).join('');
+    list.style.display = 'block';
+  });
+
+  document.addEventListener('click', e => {
+    if (!list.contains(e.target) && e.target !== input) list.style.display='none';
+  });
+  input.addEventListener('keydown', e => { if (e.key==='Escape') list.style.display='none'; });
+}
+
 /* ── INIT ── */
+restaurarFiltros();
 carregarRestaurantes();
+abrirRestauranteDaURL();
+setupPWA();
+setupOfflineDetection();
+setupScrollTop();
+setupAutocomplete();
 </script>
 </body>
 </html>
