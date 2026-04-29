@@ -125,14 +125,15 @@ exports.criarReview = onCall({ region: 'southamerica-east1' }, async (req) => {
     .collection('reviews').where('uid','==',auth.uid).limit(1).get();
   if (!prevQ.empty) throw new HttpsError('already-exists', 'Você já avaliou este restaurante');
 
-  // Salva review
+  // Salva review (aprovada:false por padrão — requer moderação no painel admin)
   await db.collection('restaurantes').doc(restauranteId).collection('reviews').add({
-    uid:      auth.uid,
-    nome:     sanitize(auth.token.name || auth.token.email?.split('@')[0] || 'Anônimo', 50),
+    uid:           auth.uid,
+    nome:          sanitize(auth.token.name || auth.token.email?.split('@')[0] || 'Anônimo', 50),
     rating,
-    texto:    textoClean,
-    criadoEm: admin.firestore.FieldValue.serverTimestamp(),
-    aprovada: true,
+    texto:         textoClean,
+    criadoEm:      admin.firestore.FieldValue.serverTimestamp(),
+    aprovada:      false,
+    pendenteSince: admin.firestore.FieldValue.serverTimestamp(),
   });
 
   // Recalcula rating médio (transação atômica)

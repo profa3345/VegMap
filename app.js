@@ -71,14 +71,39 @@ const SEED = [
            && request.resource.data.tipo is string
            && request.resource.data.donoId == request.auth.uid;
 
-         // Só o dono edita/deleta o próprio documento
-         allow update, delete: if request.auth != null
+         // ✅ CORREÇÃO: dono só pode alterar campos operacionais.
+         // Campos bloqueados (não listados): rating, reviews, destaque, promo,
+         // plano, planoAte, donoId, donoEmail, criadoEm, novo, emoji.
+         // Qualquer tentativa de enviar esses campos via SDK/curl é rejeitada.
+         allow update: if request.auth != null
+           && resource.data.donoId == request.auth.uid
+           && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['nome','tipo','bairro','preco','telefone','horario',
+                         'descricao','tags','delivery','acessivel','semgluten',
+                         'fotoUrl','lat','lng','aberto','pratos']);
+
+         allow delete: if request.auth != null
            && resource.data.donoId == request.auth.uid;
        }
 
-       // Perfis de usuário (role): só o próprio usuário lê/escreve
+       // Reviews: leitura pública, escrita APENAS via Cloud Function (Admin SDK bypassa esta regra)
+       match /restaurantes/{id}/reviews/{rev} {
+         allow read: if true;
+         allow write: if false;
+       }
+
+       // Perfis de usuário: só o próprio usuário lê/escreve
+       // plano e role são bloqueados — só Cloud Functions com Admin SDK os alteram
        match /usuarios/{uid} {
-         allow read, write: if request.auth != null && request.auth.uid == uid;
+         allow read: if request.auth != null && request.auth.uid == uid;
+         allow write: if request.auth != null && request.auth.uid == uid
+           && !('plano' in request.resource.data)
+           && !('role'  in request.resource.data);
+       }
+
+       // Rate limits: só o backend escreve
+       match /_ratelimits/{doc} {
+         allow read, write: if false;
        }
      }
    }
@@ -1151,7 +1176,7 @@ window.abrirReviews = async (restauranteId) => {
         await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
       const snap = await gd(q(col(db, 'restaurantes', restauranteId, 'reviews'),
         ob('criadoEm','desc'), lim(10)));
-      _reviewsCache[restauranteId] = snap.docs.map(d => ({id:d.id,...d.data()}));
+      _reviewsCache[restauranteId] = snap.docs.map(d => ({id:d.id,...d.data()})).filter(rv => rv.aprovada === true);
     } catch(e) {
       _reviewsCache[restauranteId] = [];
     }
@@ -1221,7 +1246,7 @@ window.abrirReviewsInline = async (restauranteId) => {
       const { collection:col, getDocs:gd, query:q, orderBy:ob, limit:lim } =
         await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
       const snap = await gd(q(col(db,'restaurantes',restauranteId,'reviews'), ob('criadoEm','desc'), lim(10)));
-      _reviewsCache[restauranteId] = snap.docs.map(d=>({id:d.id,...d.data()}));
+      _reviewsCache[restauranteId] = snap.docs.map(d=>({id:d.id,...d.data()})).filter(rv => rv.aprovada === true);
     } catch { _reviewsCache[restauranteId] = []; }
   }
 
@@ -1327,14 +1352,15 @@ window.enviarReview = async (restauranteId, textareaId, starPickerId) => {
 
     // Verifica se já avaliou (client-side — reforçado server-side via CF)
     const prevSnap = await getDoc(fd(db, 'restaurantes', restauranteId));
-    // Salva review
+    // Salva review (aprovada:false por padrão — moderação obrigatória pelo painel admin)
     await addDoc(col(db, 'restaurantes', restauranteId, 'reviews'), {
-      uid:      user.uid,
-      nome:     user.displayName || user.email?.split('@')[0] || 'Anônimo',
+      uid:           user.uid,
+      nome:          user.displayName || user.email?.split('@')[0] || 'Anônimo',
       rating,
-      texto:    texto.slice(0, 300),
-      criadoEm: sts(),
-      aprovada: true
+      texto:         texto.slice(0, 300),
+      criadoEm:      sts(),
+      aprovada:      false,
+      pendenteSince: sts(),
     });
 
     // Recalcula rating local (o backend faria isso de forma atômica)
@@ -1718,45 +1744,53 @@ window.buscarComFeedback = () => {
 ══════════════════════════════════════════════ */
 
 /*
- * FIRESTORE SECURITY RULES v2 — Produção
- * ═══════════════════════════════════════
+ * FIRESTORE SECURITY RULES v2 — Produção (versão corrigida)
+ * ══════════════════════════════════════════════════════════
  * Cole no Firebase Console → Firestore → Regras:
  *
  * rules_version = '2';
  * service cloud.firestore {
  *   match /databases/{database}/documents {
  *
- *     function isAuth()  { return request.auth != null; }
- *     function isOwner() { return resource.data.donoId == request.auth.uid; }
- *     function isPro()   {
- *       return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.plano == 'pro';
- *     }
- *     function validRestaurant() {
- *       let d = request.resource.data;
- *       return d.nome is string && d.nome.size() >= 3 && d.nome.size() <= 100
- *           && d.cidade is string && d.tipo is string
- *           && d.donoId == request.auth.uid
- *           && d.destaque == false   // só admin/sistema ativa destaque
- *           && d.criadoEm == request.time;
+ *     match /restaurantes/{id} {
+ *       allow read: if true;
+ *       allow create: if request.auth != null
+ *         && request.resource.data.keys().hasAll(['nome','cidade','tipo','donoId'])
+ *         && request.resource.data.nome is string
+ *         && request.resource.data.nome.size() >= 3
+ *         && request.resource.data.nome.size() <= 100
+ *         && request.resource.data.cidade is string
+ *         && request.resource.data.tipo is string
+ *         && request.resource.data.donoId == request.auth.uid;
+ *
+ *       // ✅ CORREÇÃO: hasOnly() bloqueia rating, reviews, destaque, promo,
+ *       // plano, planoAte, donoId, donoEmail, criadoEm, novo, emoji.
+ *       allow update: if request.auth != null
+ *         && resource.data.donoId == request.auth.uid
+ *         && request.resource.data.diff(resource.data).affectedKeys()
+ *             .hasOnly(['nome','tipo','bairro','preco','telefone','horario',
+ *                       'descricao','tags','delivery','acessivel','semgluten',
+ *                       'fotoUrl','lat','lng','aberto','pratos']);
+ *
+ *       allow delete: if request.auth != null
+ *         && resource.data.donoId == request.auth.uid;
  *     }
  *
- *     match /restaurantes/{id} {
- *       allow read:   if true;
- *       allow create: if isAuth() && validRestaurant();
- *       allow update: if isAuth() && isOwner()
- *                     && !('destaque' in request.resource.data.diff(resource.data).affectedKeys());
- *       // destaque só pode ser alterado por admin via Cloud Function
- *       allow delete: if isAuth() && isOwner();
+ *     match /restaurantes/{id}/reviews/{rid} {
+ *       allow read: if true;
+ *       allow write: if false; // só via Cloud Function (Admin SDK bypassa)
  *     }
  *
  *     match /usuarios/{uid} {
- *       allow read:  if isAuth() && request.auth.uid == uid;
- *       allow write: if isAuth() && request.auth.uid == uid
- *                    && !('plano' in request.resource.data)  // plano só via Cloud Function (pagamento)
- *                    && !('role' in request.resource.data);  // role só via Cloud Function
+ *       allow read:  if request.auth != null && request.auth.uid == uid;
+ *       allow write: if request.auth != null && request.auth.uid == uid
+ *         && !('plano' in request.resource.data)  // plano só via Cloud Function
+ *         && !('role'  in request.resource.data);  // role só via Cloud Function
  *     }
  *
- *     // Apenas Cloud Functions com credenciais de admin gravam plano e role
+ *     match /_ratelimits/{doc} {
+ *       allow read, write: if false;
+ *     }
  *   }
  * }
  */
