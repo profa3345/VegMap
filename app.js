@@ -179,6 +179,16 @@ async function verificarDuplicata(nome, cidade) {
 }
 
 /* ── FIRESTORE LOAD ── */
+// ── Calcula _dist em todos os restaurantes uma única vez ──────────────────────
+// Chamada apenas quando a posição do usuário muda ou quando novos restaurantes
+// são carregados. Evita recalcular Haversine a cada renderização do filterAll.
+function calcularDistancias() {
+  if (userLat === null) return;
+  RESTAURANTES.forEach(r => {
+    r._dist = (r.lat && r.lng) ? haversine(userLat, userLng, r.lat, r.lng) : null;
+  });
+}
+
 async function carregarRestaurantes() {
   mostrarSkeleton();
   try {
@@ -191,6 +201,7 @@ async function carregarRestaurantes() {
     console.warn('Firestore indisponível, usando dados locais:', e.message);
     RESTAURANTES = [...SEED];
   }
+  calcularDistancias(); // popula _dist se geoloc já estava ativa
   atualizarStats();
   filterAll();
 }
@@ -368,6 +379,7 @@ window.usarGeolocalizacao = () => {
         `Lat ${userLat.toFixed(4)}, Lng ${userLng.toFixed(4)}`;
       document.getElementById('sort-sel').value = 'dist';
       showToast('✅ Localização obtida! Ordenando por distância…');
+      calcularDistancias(); // calcula _dist uma única vez para todos os restaurantes
       filterAll();
     },
     () => {
@@ -504,13 +516,8 @@ window.filterAll = function() {
     return true;
   });
 
-  // Calcula distância se disponível
-  if (userLat !== null) {
-    list = list.map(r => ({
-      ...r,
-      _dist: (r.lat && r.lng) ? haversine(userLat, userLng, r.lat, r.lng) : null
-    }));
-  }
+  // Usa _dist pré-calculado (atualizado em usarGeolocalizacao e carregarRestaurantes).
+  // Não recalcula a cada filterAll — economiza CPU em listas grandes.
 
   atualizarBadgeFiltros();
 
@@ -566,9 +573,8 @@ function renderCards(list) {
     return;
   }
 
-  cont.innerHTML = list.map((r, i) => {
+  cont.innerHTML = list.map((r) => {
     const isFav    = favorites.has(r.id);
-    const delay    = (i % PER_PAGE) * 0.05;
     const listCls  = currentView === 'list' ? ' rest-card-list' : '';
     const distBadge = (r._dist != null)
       ? `<span class="card-dist">📍 ${r._dist.toFixed(1)} km</span>` : '';
@@ -576,7 +582,7 @@ function renderCards(list) {
     const fotoEl   = r.fotoUrl
       ? `<img class="card-photo lazy-img" data-src="${esc(r.fotoUrl)}" alt="${esc(r.nome)}" loading="lazy" style="opacity:0;transition:opacity .3s">` : '';
     return `
-    <div class="rest-card${listCls}" style="animation-delay:${delay}s" data-id="${esc(r.id)}" role="button" tabindex="0" aria-label="${esc(r.nome)}">
+    <div class="rest-card${listCls}" data-id="${esc(r.id)}" role="button" tabindex="0" aria-label="${esc(r.nome)}">
       <div class="card-img-wrap">
         <div class="card-img-inner" aria-hidden="true">${esc(r.emoji||'🌿')}</div>
         ${fotoEl}
@@ -674,11 +680,11 @@ window.onSearchInput = () => {
   document.getElementById('search-clear').style.display = document.getElementById('main-search').value ? 'flex' : 'none';
   clearTimeout(searchDebounce);
   searchDebounce = setTimeout(() => {
-    currentPage=1;
+    currentPage = 1;
     filterAll();
     const q = document.getElementById('main-search').value.trim();
     if (q.length > 2) logEvento('search', { search_term: q });
-  }, 280);
+  }, 500);
 };
 window.clearSearch = () => { document.getElementById('main-search').value=''; document.getElementById('search-clear').style.display='none'; currentPage=1; filterAll(); };
 window.resetFilters = () => {
