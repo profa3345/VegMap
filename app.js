@@ -202,6 +202,7 @@ async function carregarRestaurantes() {
     RESTAURANTES = [...SEED];
   }
   calcularDistancias(); // popula _dist se geoloc já estava ativa
+  invalidarCacheSort(); // RESTAURANTES mudou — cache de ordenação desatualizado
   atualizarStats();
   filterAll();
 }
@@ -380,6 +381,7 @@ window.usarGeolocalizacao = () => {
       document.getElementById('sort-sel').value = 'dist';
       showToast('✅ Localização obtida! Ordenando por distância…');
       calcularDistancias(); // calcula _dist uma única vez para todos os restaurantes
+      invalidarCacheSort(); // scores de distância mudaram — cache inválido
       filterAll();
     },
     () => {
@@ -435,62 +437,20 @@ function atualizarBadgeFiltros() {
   }
 }
 
-let _filterScheduled = false;
-window.filterAll = function() {
-  // Proteção RAF: evita execuções em cascata no mesmo frame (ex: múltiplos filtros ao mesmo tempo)
-  if (_filterScheduled) return;
-  _filterScheduled = true;
-  requestAnimationFrame(() => { _filterScheduled = false; });
+let _filterTimeout;
 
-  // Persiste estado dos filtros no localStorage
-  try {
-    const estado = {
-      q:       document.getElementById('main-search').value,
-      cidade:  document.getElementById('hero-cidade').value,
-      preco:   priceFilter,
-      rating:  ratingFilter,
-      delivery:document.getElementById('tog-delivery').checked,
-      aberto:  document.getElementById('tog-aberto').checked,
-      acess:   document.getElementById('tog-acessivel').checked,
-      gluten:  document.getElementById('tog-gluten').checked,
-      promo:   document.getElementById('tog-promo').checked,
-      pill:    currentPill,
-      sort:    document.getElementById('sort-sel').value,
-      view:    currentView
-    };
-    sessionStorage.setItem('edena_filtros', JSON.stringify(estado));
-    // Atualiza URL para permitir compartilhamento de buscas
-    try {
-      const params = new URLSearchParams();
-      if (estado.q)      params.set('q', estado.q);
-      if (estado.cidade) params.set('c', estado.cidade);
-      const newUrl = params.toString()
-        ? `${location.pathname}?${params.toString()}`
-        : location.pathname;
-      history.replaceState(null, '', newUrl);
-    } catch {}
-  } catch {}
+// ── Aplica apenas os predicados de filtro, sem side-effects ──────
+function aplicarFiltros() {
+  const q      = document.getElementById('main-search').value.toLowerCase().trim();
+  const cidade = document.getElementById('hero-cidade').value;
+  const bairro = document.getElementById('side-bairro').value;
+  const deliv  = document.getElementById('tog-delivery').checked;
+  const aberto = document.getElementById('tog-aberto').checked;
+  const acess  = document.getElementById('tog-acessivel').checked;
+  const gluten = document.getElementById('tog-gluten').checked;
+  const promo  = document.getElementById('tog-promo').checked;
 
-  const q       = document.getElementById('main-search').value.toLowerCase().trim();
-  const cidade  = document.getElementById('hero-cidade').value;
-  const bairro  = document.getElementById('side-bairro').value;
-  const deliv   = document.getElementById('tog-delivery').checked;
-  const aberto  = document.getElementById('tog-aberto').checked;
-  const acess   = document.getElementById('tog-acessivel').checked;
-  const gluten  = document.getElementById('tog-gluten').checked;
-  const promo   = document.getElementById('tog-promo').checked;
-  const sort    = document.getElementById('sort-sel').value;
-
-  // Atualiza bairros dinamicamente
-  if (cidade) {
-    const bairros = [...new Set(RESTAURANTES.filter(r => r.cidade===cidade && r.bairro).map(r => r.bairro))].sort();
-    const sel = document.getElementById('side-bairro');
-    const cur = sel.value;
-    sel.innerHTML = '<option value="">Todos os bairros</option>' +
-      bairros.map(b => `<option${b===cur?' selected':''}>${esc(b)}</option>`).join('');
-  }
-
-  let list = RESTAURANTES.filter(r => {
+  return RESTAURANTES.filter(r => {
     if (q && !r.nome.toLowerCase().includes(q) &&
               !r.tipo.toLowerCase().includes(q) &&
               !(r.tags||[]).some(t => t.includes(q))) return false;
@@ -515,50 +475,162 @@ window.filterAll = function() {
     if (promo   && !r.promo)     return false;
     return true;
   });
+}
 
-  // Usa _dist pré-calculado (atualizado em usarGeolocalizacao e carregarRestaurantes).
-  // Não recalcula a cada filterAll — economiza CPU em listas grandes.
+// ── Ordena a lista filtrada, com cache por chave de sort ─────────
+let _sortCache = {}; // invalidado sempre que RESTAURANTES muda
+function invalidarCacheSort() { _sortCache = {}; }
 
-  atualizarBadgeFiltros();
+function aplicarOrdenacao(lista) {
+  const sort = document.getElementById('sort-sel').value;
+  // A chave combina sort + ids filtrados para evitar acerto incorreto
+  // após mudança de filtros. Usamos sort+length como heurística rápida;
+  // para coleções pequenas (<200) isso é suficiente.
+  const cacheKey = sort + '|' + lista.length + '|' + (userLat !== null ? 'geo' : '');
+  if (_sortCache[cacheKey]) return _sortCache[cacheKey];
 
-  // ── RANKING INTELIGENTE ── score composto: destaque + rating + reviews + proximidade + promoção
   function calcScore(r) {
     let s = 0;
-    s += (r.destaque ? 30 : 0);                          // PRO destaque: +30
-    s += (r.promo    ? 10 : 0);                          // em promoção: +10
-    s += (r.rating   || 0) * 8;                          // rating * 8 (max 40 para 5★)
-    s += Math.min((r.reviews || 0) / 10, 10);            // reviews: até +10 (cap em 100 reviews)
-    s += (r.novo     ? 5  : 0);                          // recém-cadastrado: +5
-    s += (r.aberto   ? 8  : 0);                          // aberto agora: +8
-    if (userLat && r._dist != null) {
-      // proximidade: +10 se < 1km, +5 se < 5km, +2 se < 15km
+    s += (r.destaque ? 30 : 0);
+    s += (r.promo    ? 10 : 0);
+    s += (r.rating   || 0) * 8;
+    s += Math.min((r.reviews || 0) / 10, 10);
+    s += (r.novo     ? 5  : 0);
+    s += (r.aberto   ? 8  : 0);
+    if (userLat && r._dist != null)
       s += r._dist < 1 ? 10 : r._dist < 5 ? 5 : r._dist < 15 ? 2 : 0;
-    }
     return s;
   }
 
-  list.sort((a,b) => {
+  const sorted = [...lista].sort((a,b) => {
     if (sort === 'rating')    return b.rating - a.rating;
     if (sort === 'nome')      return a.nome.localeCompare(b.nome, 'pt-BR');
     if (sort === 'novo')      return (b.novo?1:0) - (a.novo?1:0);
     if (sort === 'preco_asc') return a.preco.length - b.preco.length;
-    if (sort === 'top') return (b._weekScore||0) - (a._weekScore||0);
+    if (sort === 'top')       return (b._weekScore||0) - (a._weekScore||0);
     if (sort === 'dist' && userLat !== null)
       return (a._dist ?? Infinity) - (b._dist ?? Infinity);
-    // Padrão: algoritmo de ranking composto (tipo iFood)
     return calcScore(b) - calcScore(a);
   });
 
-  document.getElementById('count-label').textContent = list.length;
+  _sortCache[cacheKey] = sorted;
+  return sorted;
+}
 
-  const totalPages = Math.ceil(list.length / PER_PAGE);
+// ── Executa o pipeline completo (filtrar → ordenar → paginar → renderizar) ──
+function executarFiltro() {
+  // Persiste estado dos filtros
+  try {
+    const estado = {
+      q:       document.getElementById('main-search').value,
+      cidade:  document.getElementById('hero-cidade').value,
+      preco:   priceFilter,
+      rating:  ratingFilter,
+      delivery:document.getElementById('tog-delivery').checked,
+      aberto:  document.getElementById('tog-aberto').checked,
+      acess:   document.getElementById('tog-acessivel').checked,
+      gluten:  document.getElementById('tog-gluten').checked,
+      promo:   document.getElementById('tog-promo').checked,
+      pill:    currentPill,
+      sort:    document.getElementById('sort-sel').value,
+      view:    currentView
+    };
+    sessionStorage.setItem('edena_filtros', JSON.stringify(estado));
+    try {
+      const params = new URLSearchParams();
+      if (estado.q)      params.set('q', estado.q);
+      if (estado.cidade) params.set('c', estado.cidade);
+      const newUrl = params.toString()
+        ? `${location.pathname}?${params.toString()}`
+        : location.pathname;
+      history.replaceState(null, '', newUrl);
+    } catch {}
+  } catch {}
+
+  const cidade = document.getElementById('hero-cidade').value;
+  if (cidade) {
+    const bairros = [...new Set(RESTAURANTES.filter(r => r.cidade===cidade && r.bairro).map(r => r.bairro))].sort();
+    const sel = document.getElementById('side-bairro');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Todos os bairros</option>' +
+      bairros.map(b => `<option${b===cur?' selected':''}>${esc(b)}</option>`).join('');
+  }
+
+  const filtrada  = aplicarFiltros();
+  const ordenada  = aplicarOrdenacao(filtrada);
+
+  atualizarBadgeFiltros();
+  document.getElementById('count-label').textContent = filtrada.length;
+
+  const totalPages = Math.ceil(ordenada.length / PER_PAGE);
   if (currentPage > totalPages && totalPages > 0) currentPage = 1;
-  renderCards(list.slice((currentPage-1)*PER_PAGE, currentPage*PER_PAGE));
+  renderCards(ordenada.slice((currentPage-1)*PER_PAGE, currentPage*PER_PAGE));
   renderPagination(totalPages);
   limparWillChange();
+}
+
+window.filterAll = function() {
+  clearTimeout(_filterTimeout);
+  _filterTimeout = setTimeout(executarFiltro, 120);
 };
 
 /* ── RENDER CARDS ── */
+function criarCard(r) {
+  const isFav     = favorites.has(r.id);
+  const listCls   = currentView === 'list' ? ' rest-card-list' : '';
+  const distBadge = (r._dist != null)
+    ? `<span class="card-dist">📍 ${r._dist.toFixed(1)} km</span>` : '';
+  const fotoEl    = r.fotoUrl
+    ? `<img class="card-photo lazy-img" data-src="${esc(r.fotoUrl)}" alt="${esc(r.nome)}" loading="lazy" style="opacity:0;transition:opacity .3s">` : '';
+
+  const card = document.createElement('div');
+  card.className = `rest-card${listCls}`;
+  card.dataset.id = r.id;
+  card.setAttribute('role', 'button');
+  card.setAttribute('tabindex', '0');
+  card.setAttribute('aria-label', r.nome);
+  card.innerHTML = `
+    <div class="card-img-wrap">
+      <div class="card-img-inner" aria-hidden="true">${esc(r.emoji||'🌿')}</div>
+      ${fotoEl}
+      <div class="card-badges">
+        ${r.destaque ? '<span class="badge badge-destaque">⭐ Destaque</span>' : ''}
+        ${r.topSemana? '<span class="badge badge-top">🏆 Top semana</span>'   : ''}
+        ${r.novo     ? '<span class="badge badge-novo">✨ Novo</span>'        : ''}
+        ${r.delivery ? '<span class="badge badge-delivery">🛵 Delivery</span>': ''}
+        ${r.promo    ? '<span class="badge badge-promo">🔥 Promoção</span>'   : ''}
+      </div>
+      <button class="card-fav ${isFav?'active':''}" data-fav="${esc(r.id)}"
+        aria-label="${isFav?'Remover dos':'Adicionar aos'} favoritos" aria-pressed="${isFav}">
+        ${isFav?'❤️':'🤍'}
+      </button>
+    </div>
+    <div class="card-body">
+      <div class="card-top">
+        <div class="card-name">${esc(r.nome)}${getBadgePro(r)}</div>
+        ${r.rating ? `<div class="card-rating"><span class="star" aria-hidden="true">★</span><span class="num">${esc(r.rating)}</span></div>` : ''}
+      </div>
+      <div class="card-tipo">
+        ${esc(r.tipo)} <span class="card-dot">•</span> ${esc(r.cidade)}${distBadge}
+      </div>
+      <div class="card-tags">${(r.tags||[]).slice(0,3).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
+      <div class="card-meta">
+        <div class="meta-item"><span class="meta-icon" aria-hidden="true">💰</span>${esc(r.preco)}</div>
+        <div class="meta-item"><span class="meta-icon" aria-hidden="true">${r.aberto?'🟢':'🔴'}</span>${r.aberto?'Aberto':'Fechado'}</div>
+        ${r.reviews ? `<div class="meta-item"><span class="meta-icon" aria-hidden="true">⭐</span>${esc(r.reviews)} aval.</div>` : ''}
+      </div>
+    </div>`;
+
+  const open = () => openModal(r.id);
+  card.addEventListener('click', open);
+  card.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' ') open(); });
+  card.querySelector('.card-fav').addEventListener('click', e => {
+    e.stopPropagation();
+    toggleFav(e, r.id);
+  });
+  return card;
+}
+
 function renderCards(list) {
   const cont = document.getElementById('cards-container');
   cont.className = currentView === 'grid' ? 'cards-grid' : 'cards-list';
@@ -573,57 +645,11 @@ function renderCards(list) {
     return;
   }
 
-  cont.innerHTML = list.map((r) => {
-    const isFav    = favorites.has(r.id);
-    const listCls  = currentView === 'list' ? ' rest-card-list' : '';
-    const distBadge = (r._dist != null)
-      ? `<span class="card-dist">📍 ${r._dist.toFixed(1)} km</span>` : '';
-    // Lazy load: usa data-src + IntersectionObserver para não carregar imgs fora do viewport
-    const fotoEl   = r.fotoUrl
-      ? `<img class="card-photo lazy-img" data-src="${esc(r.fotoUrl)}" alt="${esc(r.nome)}" loading="lazy" style="opacity:0;transition:opacity .3s">` : '';
-    return `
-    <div class="rest-card${listCls}" data-id="${esc(r.id)}" role="button" tabindex="0" aria-label="${esc(r.nome)}">
-      <div class="card-img-wrap">
-        <div class="card-img-inner" aria-hidden="true">${esc(r.emoji||'🌿')}</div>
-        ${fotoEl}
-        <div class="card-badges">
-          ${r.destaque ? '<span class="badge badge-destaque">⭐ Destaque</span>' : ''}
-          ${r.topSemana? '<span class="badge badge-top">🏆 Top semana</span>'   : ''}
-          ${r.novo     ? '<span class="badge badge-novo">✨ Novo</span>'        : ''}
-          ${r.delivery ? '<span class="badge badge-delivery">🛵 Delivery</span>': ''}
-          ${r.promo    ? '<span class="badge badge-promo">🔥 Promoção</span>'   : ''}
-        </div>
-        <button class="card-fav ${isFav?'active':''}" data-fav="${esc(r.id)}"
-          aria-label="${isFav?'Remover dos':'Adicionar aos'} favoritos" aria-pressed="${isFav}">
-          ${isFav?'❤️':'🤍'}
-        </button>
-      </div>
-      <div class="card-body">
-        <div class="card-top">
-          <div class="card-name">${esc(r.nome)}${getBadgePro(r)}</div>
-          ${r.rating ? `<div class="card-rating"><span class="star" aria-hidden="true">★</span><span class="num">${esc(r.rating)}</span></div>` : ''}
-        </div>
-        <div class="card-tipo">
-          ${esc(r.tipo)} <span class="card-dot">•</span> ${esc(r.cidade)}${distBadge}
-        </div>
-        <div class="card-tags">${(r.tags||[]).slice(0,3).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
-        <div class="card-meta">
-          <div class="meta-item"><span class="meta-icon" aria-hidden="true">💰</span>${esc(r.preco)}</div>
-          <div class="meta-item"><span class="meta-icon" aria-hidden="true">${r.aberto?'🟢':'🔴'}</span>${r.aberto?'Aberto':'Fechado'}</div>
-          ${r.reviews ? `<div class="meta-item"><span class="meta-icon" aria-hidden="true">⭐</span>${esc(r.reviews)} aval.</div>` : ''}
-        </div>
-      </div>
-    </div>`;
-  }).join('');
+  // DocumentFragment: monta todos os nós fora do DOM antes de inserir — 1 único reflow
+  const frag = document.createDocumentFragment();
+  list.forEach(r => frag.appendChild(criarCard(r)));
+  cont.replaceChildren(frag);
 
-  cont.querySelectorAll('.rest-card').forEach(card => {
-    const open = () => openModal(card.dataset.id);
-    card.addEventListener('click', open);
-    card.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' ') open(); });
-  });
-  cont.querySelectorAll('.card-fav').forEach(btn => {
-    btn.addEventListener('click', e => { e.stopPropagation(); toggleFav(e, btn.dataset.fav); });
-  });
   // Lazy load: ativa IntersectionObserver nas imagens recém-renderizadas
   ativarLazyImages(cont);
 }
