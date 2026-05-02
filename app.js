@@ -9,15 +9,40 @@ import { getAuth, signInWithPopup, GoogleAuthProvider,
                                    from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
 import { getAnalytics, logEvent }  from "https://www.gstatic.com/firebasejs/11.1.0/firebase-analytics.js";
 
-/* ── CONFIG ── */
-const FB = initializeApp({
-  apiKey:            "AIzaSyAcRZch-DZrHtOZaEBl735iwnFp4Yf4N78",
-  authDomain:        "vegmap-21101.firebaseapp.com",
-  projectId:         "vegmap-21101",
-  storageBucket:     "vegmap-21101.firebasestorage.app",
-  messagingSenderId: "615815897277",
-  appId:             "1:615815897277:web:a58e2d6e4aa798565657d4"
-});
+/* ── CONFIG ──
+ * SEGURANÇA: as credenciais Firebase NÃO devem ficar hardcoded aqui.
+ * Injete-as via variáveis de ambiente no build (Vite/Webpack) ou
+ * via um endpoint autenticado no backend.
+ *
+ * Exemplo com Vite (.env.local — nunca comite esse arquivo):
+ *   VITE_FB_API_KEY=AIza...
+ *   VITE_FB_PROJECT_ID=vegmap-21101
+ *   ...
+ *
+ * E aqui:
+ *   apiKey: import.meta.env.VITE_FB_API_KEY,
+ *
+ * Restrinja também a apiKey no Firebase Console:
+ *   APIs & Services → Credentials → HTTP referrers → adicione seu domínio.
+ *
+ * Para projetos sem bundler: use um endpoint /api/firebase-config protegido
+ * por autenticação ou por verificação de origin no servidor.
+ */
+const _fbCfg = (() => {
+  // Tenta ler do objeto global injetado pelo servidor (recomendado em produção)
+  if (typeof __FIREBASE_CONFIG__ !== 'undefined') return __FIREBASE_CONFIG__;
+  // Fallback para desenvolvimento local — NÃO use em produção
+  console.warn('[EDENA] Firebase config carregada do fallback. Configure variáveis de ambiente.');
+  return {
+    apiKey:            "AIzaSyAcRZch-DZrHtOZaEBl735iwnFp4Yf4N78",
+    authDomain:        "vegmap-21101.firebaseapp.com",
+    projectId:         "vegmap-21101",
+    storageBucket:     "vegmap-21101.firebasestorage.app",
+    messagingSenderId: "615815897277",
+    appId:             "1:615815897277:web:a58e2d6e4aa798565657d4"
+  };
+})();
+const FB = initializeApp(_fbCfg);
 const db        = getFirestore(FB);
 const storage   = getStorage(FB);
 const auth      = getAuth(FB);
@@ -33,7 +58,65 @@ function logEvento(nome, params = {}) {
   }
 }
 
-/* ── SEED DATA (fallback enquanto Firestore está vazio) ── */
+/* ── CALCULAR "ABERTO AGORA" pelo campo horario ──────────────────────────────
+ * Interpreta strings como "Seg-Sex 11h-15h | Sex-Dom 18h-22h"
+ * Retorna true se o momento atual cair em algum intervalo.
+ */
+const DIAS_PT = { seg:1, ter:2, qua:3, qui:4, sex:5, sab:6, dom:0 };
+function estaAbertoAgora(horarioStr) {
+  if (!horarioStr || typeof horarioStr !== 'string') return false;
+  const now  = new Date();
+  const dow  = now.getDay();   // 0=dom ... 6=sab
+  const mins = now.getHours() * 60 + now.getMinutes();
+
+  // Divide em blocos separados por "|" ou "/"
+  const blocos = horarioStr.split(/[|/]/).map(s => s.trim());
+  for (const bloco of blocos) {
+    // Exemplo: "Seg-Sex 11h-15h" ou "Seg-Dom 7h-20h" ou "Sex-Dom 18h-22h"
+    const m = bloco.match(/^(\w+)(?:-(\w+))?\s+(\d+)h(?:(\d+)m?)?\s*[-–]\s*(\d+)h(?:(\d+)m?)?$/i);
+    if (!m) continue;
+    const [, diaIni, diaFim, hIni, mIni='0', hFim, mFim='0'] = m;
+    const di = DIAS_PT[diaIni.toLowerCase()];
+    const df = diaFim ? DIAS_PT[diaFim.toLowerCase()] : di;
+    if (di === undefined || df === undefined) continue;
+
+    // Constrói lista de dias cobertos (circular — ex: Sex=5 até Dom=0)
+    let diasCobertos = [];
+    if (df >= di) {
+      for (let d = di; d <= df; d++) diasCobertos.push(d);
+    } else {
+      for (let d = di; d <= 6; d++) diasCobertos.push(d);
+      for (let d = 0; d <= df; d++) diasCobertos.push(d);
+    }
+
+    if (!diasCobertos.includes(dow)) continue;
+
+    const inicio = parseInt(hIni) * 60 + parseInt(mIni);
+    const fim    = parseInt(hFim)  * 60 + parseInt(mFim);
+    if (mins >= inicio && mins < fim) return true;
+  }
+  return false;
+}
+
+/* Sobrescreve o campo `aberto` de cada restaurante ao carregar e a cada hora */
+function atualizarStatusAberto() {
+  RESTAURANTES.forEach(r => {
+    if (r.horario) r.aberto = estaAbertoAgora(r.horario);
+  });
+  invalidarCacheSort();
+  filterAll();
+}
+
+/* Atualiza no carregamento e todo início de hora */
+function agendarAtualizacaoAberto() {
+  atualizarStatusAberto();
+  const now    = new Date();
+  const msAteProximaHora = (60 - now.getMinutes()) * 60000 - now.getSeconds() * 1000;
+  setTimeout(() => {
+    atualizarStatusAberto();
+    setInterval(atualizarStatusAberto, 60 * 60 * 1000);
+  }, msAteProximaHora);
+} */
 const SEED = [
   {id:'s1',  nome:"Verde Vivo",          tipo:"Restaurante Vegano",           cidade:"Vitoria",    bairro:"Praia do Canto",    emoji:"🌿", rating:4.9, reviews:312, preco:"$$",  delivery:true,  aberto:true,  acessivel:true,  semgluten:false, novo:false, destaque:true,  promo:false, tags:["vegano","por-quilo","almoço"],              descricao:"O restaurante vegano mais premiado de Vitória.",           horario:"Seg-Sex 11h-15h | Sex-Dom 18h-22h", telefone:"(27) 3344-1234", lat:-20.273, lng:-40.297, pratos:[{nome:"Feijoada Vegana",        desc:"Grãos, proteína vegetal, couve",preco:"R$ 38"},{nome:"Prato Executivo",      desc:"Arroz integral + proteína + 3 saladas",preco:"R$ 32"}]},
   {id:'s2',  nome:"Raízes Café",          tipo:"Café & Confeitaria Vegana",    cidade:"Vitoria",    bairro:"Jardim da Penha",   emoji:"☕", rating:4.8, reviews:198, preco:"$",   delivery:true,  aberto:true,  acessivel:true,  semgluten:true,  novo:false, destaque:false, promo:true,  tags:["café","confeitaria","vegano","sem-gluten"],  descricao:"Café vegano especializado em bolos e bebidas artesanais.", horario:"Seg-Dom 7h-20h",             telefone:"(27) 3311-4422", lat:-20.261, lng:-40.289, pratos:[{nome:"Cappuccino de Aveia",     desc:"Leite de aveia artesanal",     preco:"R$ 14"},{nome:"Bolo de Limão",        desc:"Bolo vegano com cobertura",    preco:"R$ 12"}]},
@@ -149,22 +232,30 @@ function haversine(la1, ln1, la2, ln2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
-/* ── RATE LIMITER (client-side) ── */
-// Previne spam de cadastro: máx 3 submissões por hora por dispositivo
+/* ── RATE LIMITER (client-side — camada de UX, NÃO de segurança) ──
+ * ⚠️  Este limite é bypassável via DevTools (localStorage.removeItem).
+ * Serve apenas para evitar cliques acidentais repetidos na UI.
+ * O limite real de segurança DEVE ser implementado no servidor:
+ *   - Firebase App Check (bloqueia clientes não autorizados)
+ *   - Cloud Function com contador por UID no Firestore
+ *   - Ou campo `_submissions` em /usuarios/{uid} com regra Firestore:
+ *       allow create: if resource == null || resource.data._submissions < 3;
+ */
 const RATE_KEY = 'edena_submissions';
 function checkRateLimit() {
   const now = Date.now();
   const ONE_HOUR = 60 * 60 * 1000;
-  const raw = JSON.parse(localStorage.getItem(RATE_KEY) || '[]');
-  // Mantém só os do último 1h
-  const recent = raw.filter(t => now - t < ONE_HOUR);
+  let raw = [];
+  try { raw = JSON.parse(localStorage.getItem(RATE_KEY) || '[]'); } catch {}
+  if (!Array.isArray(raw)) raw = [];
+  const recent = raw.filter(t => typeof t === 'number' && now - t < ONE_HOUR);
   if (recent.length >= 3) {
     const wait = Math.ceil((ONE_HOUR - (now - recent[0])) / 60000);
     showToast(`⚠️ Limite atingido. Tente novamente em ${wait} min.`);
     return false;
   }
   recent.push(now);
-  localStorage.setItem(RATE_KEY, JSON.stringify(recent));
+  try { localStorage.setItem(RATE_KEY, JSON.stringify(recent)); } catch {}
   return true;
 }
 
@@ -189,23 +280,60 @@ function calcularDistancias() {
   });
 }
 
-async function carregarRestaurantes() {
+/* ── PAGINAÇÃO COM CURSOR (Firestore startAfter) ──────────────────────────────
+ * Carrega até PAGE_SIZE documentos por vez e permite buscar mais sob demanda.
+ * Substitui o getDocs sem limite que trazia todos os documentos de uma vez.
+ */
+const PAGE_SIZE = 50; // documentos por página Firestore
+let _lastFirestoreDoc = null; // cursor para a próxima página
+let _todosCarregados  = false; // true quando não há mais páginas
+
+async function carregarRestaurantes(resetar = true) {
+  if (resetar) {
+    _lastFirestoreDoc = null;
+    _todosCarregados  = false;
+  }
   mostrarSkeleton();
   try {
-    const snap = await getDocs(query(collection(db,'restaurantes'), orderBy('criadoEm','desc')));
+    const { query: q, collection: col, orderBy: ob, startAfter, limit: lim } =
+      await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
+
+    let qBase = q(col(db, 'restaurantes'), ob('criadoEm', 'desc'), lim(PAGE_SIZE));
+    if (_lastFirestoreDoc) qBase = q(col(db, 'restaurantes'), ob('criadoEm', 'desc'), startAfter(_lastFirestoreDoc), lim(PAGE_SIZE));
+
+    const snap   = await getDocs(qBase);
     const remote = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    if (snap.docs.length < PAGE_SIZE) _todosCarregados = true;
+    if (snap.docs.length > 0) _lastFirestoreDoc = snap.docs[snap.docs.length - 1];
+
     const seedIds = new Set(SEED.map(s => s.id));
     const novos   = remote.filter(r => !seedIds.has(r.id));
-    RESTAURANTES  = [...SEED, ...novos];
+
+    if (resetar) {
+      RESTAURANTES = [...SEED, ...novos];
+    } else {
+      // Append: evita duplicatas por id
+      const existIds = new Set(RESTAURANTES.map(r => r.id));
+      RESTAURANTES = [...RESTAURANTES, ...novos.filter(r => !existIds.has(r.id))];
+    }
   } catch(e) {
     console.warn('Firestore indisponível, usando dados locais:', e.message);
-    RESTAURANTES = [...SEED];
+    if (resetar) RESTAURANTES = [...SEED];
+    _todosCarregados = true;
   }
   calcularDistancias(); // popula _dist se geoloc já estava ativa
   invalidarCacheSort(); // RESTAURANTES mudou — cache de ordenação desatualizado
   atualizarStats();
-  filterAll();
+  agendarAtualizacaoAberto(); // calcula aberto/fechado dinamicamente pelo horario
 }
+
+/* Carrega próxima página Firestore (chamável por botão "Ver mais" no futuro) */
+window.carregarMaisRestaurantes = async () => {
+  if (_todosCarregados) { showToast('Todos os restaurantes já foram carregados.'); return; }
+  await carregarRestaurantes(false);
+  filterAll();
+};
 
 /* ── ROLE DO USUÁRIO ── */
 async function carregarRole(uid) {
@@ -483,10 +611,10 @@ function invalidarCacheSort() { _sortCache = {}; }
 
 function aplicarOrdenacao(lista) {
   const sort = document.getElementById('sort-sel').value;
-  // A chave combina sort + ids filtrados para evitar acerto incorreto
-  // após mudança de filtros. Usamos sort+length como heurística rápida;
-  // para coleções pequenas (<200) isso é suficiente.
-  const cacheKey = sort + '|' + lista.length + '|' + (userLat !== null ? 'geo' : '');
+  // Chave forte: combina sort + hash dos IDs da lista filtrada.
+  // Evita colisões quando duas listas têm mesmo tamanho mas itens diferentes.
+  const idsHash = lista.map(r => r.id).join(',');
+  const cacheKey = sort + '|' + (userLat !== null ? 'geo' : '') + '|' + idsHash;
   if (_sortCache[cacheKey]) return _sortCache[cacheKey];
 
   function calcScore(r) {
@@ -538,8 +666,17 @@ function executarFiltro() {
     sessionStorage.setItem('edena_filtros', JSON.stringify(estado));
     try {
       const params = new URLSearchParams();
-      if (estado.q)      params.set('q', estado.q);
-      if (estado.cidade) params.set('c', estado.cidade);
+      if (estado.q)        params.set('q',  estado.q);
+      if (estado.cidade)   params.set('c',  estado.cidade);
+      if (estado.preco)    params.set('p',  estado.preco);
+      if (estado.rating)   params.set('r',  estado.rating);
+      if (estado.pill && !['__favoritos__',''].includes(estado.pill)) params.set('cat', estado.pill);
+      if (estado.delivery) params.set('delivery', '1');
+      if (estado.aberto)   params.set('aberto',   '1');
+      if (estado.acess)    params.set('acess',    '1');
+      if (estado.gluten)   params.set('gluten',   '1');
+      if (estado.promo)    params.set('promo',    '1');
+      if (estado.sort)     params.set('sort',     estado.sort);
       const newUrl = params.toString()
         ? `${location.pathname}?${params.toString()}`
         : location.pathname;
@@ -649,6 +786,9 @@ function renderCards(list) {
   const frag = document.createDocumentFragment();
   list.forEach(r => frag.appendChild(criarCard(r)));
   cont.replaceChildren(frag);
+
+  // Anuncia total para leitores de tela (aria-live="polite" no container)
+  cont.setAttribute('aria-label', `${list.length} resultado${list.length !== 1 ? 's' : ''} encontrado${list.length !== 1 ? 's' : ''}`);
 
   // Lazy load: ativa IntersectionObserver nas imagens recém-renderizadas
   ativarLazyImages(cont);
@@ -796,9 +936,11 @@ window.openModal = id => {
       ${pratosHTML ? `<div class="modal-section-title">Cardápio em destaque</div><div class="menu-items">${pratosHTML}</div>` : ''}
       <div class="modal-action-btns">
         ${wppTel ? `<a href="https://wa.me/55${wppTel}" target="_blank" rel="noopener" class="btn-ver-site" style="background:linear-gradient(135deg,#25d366,#128c7e);text-decoration:none;display:block;text-align:center" onclick="logEvento('whatsapp_click',{restaurant_id:'${esc(r.id)}',name:'${esc(r.nome)}'})">💬 Chamar no WhatsApp</a>` : ''}
-        <a href="${mapsUrl}" target="_blank" rel="noopener" class="modal-map-btn" onclick="logEvento('maps_click',{restaurant_id:'${esc(r.id)}',name:'${esc(r.nome)}'})">🗺️ Ver no Google Maps</a>
+        <a href="${mapsUrl}" target="_blank" rel="noopener" class="btn-ir-agora" onclick="logEvento('maps_navigate',{restaurant_id:'${esc(r.id)}',name:'${esc(r.nome)}'})">🧭 Ir agora — Google Maps</a>
+        <a href="${mapsUrl.replace('google.com/maps','waze.com/ul').replace('?q=','?ll=')}" target="_blank" rel="noopener" class="modal-map-btn" style="display:flex;align-items:center;justify-content:center;gap:6px">🚗 Abrir no Waze</a>
         ${r.telefone ? `<a href="tel:${esc(r.telefone)}" class="modal-tel-btn">📞 Ligar: ${esc(r.telefone)}</a>` : ''}
         <button class="modal-tel-btn" style="cursor:pointer;text-align:center;width:100%" data-reviews-id="">💬 Ver avaliações (${r.reviews||0})</button>
+        <button class="btn-denunciar" onclick="abrirDenuncia('${esc(r.id)}','${esc(r.nome)}')">⚠️ Denunciar informação incorreta</button>
       </div>
     <div id="reviews-inline" style="display:none"></div>
     </div>`;
@@ -864,7 +1006,7 @@ window.closeModal = () => {
     overlay.style.transition = '';
     document.body.style.overflow = '';
     // Restaura título e OG padrão
-    document.title = 'EDENA — Salvando Vida, Encontrando Sabor';
+    document.title = 'EDENA — Guia Vegano do ES';
     const ogTitle = document.querySelector('meta[property="og:title"]');
     if (ogTitle) ogTitle.setAttribute('content', 'EDENA — Restaurantes Veganos no ES');
   }, 180);
@@ -1048,14 +1190,33 @@ window.salvarRestaurante = async () => {
     if (fotoInput.files[0]) {
       status.textContent = '📤 Enviando foto…';
       const file   = fotoInput.files[0];
-      // Valida MIME type real (não apenas extensão do nome)
+
+      // Valida o magic number (primeiros bytes reais) — não confia apenas em file.type
       const ALLOWED_TYPES = ['image/jpeg','image/png','image/webp'];
-      if (!ALLOWED_TYPES.includes(file.type)) {
-        showToast('⚠️ Formato inválido. Use JPG, PNG ou WebP.');
-        throw new Error('Tipo de arquivo não permitido: ' + file.type);
+      const MAGIC = {
+        jpeg: [0xFF, 0xD8, 0xFF],
+        png:  [0x89, 0x50, 0x4E, 0x47],
+        webp: [0x52, 0x49, 0x46, 0x46], // "RIFF" — confirmado abaixo com offset 8
+      };
+      const headerBytes = await new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = e => res(new Uint8Array(e.target.result));
+        fr.onerror = () => rej(new Error('Leitura falhou'));
+        fr.readAsArrayBuffer(file.slice(0, 12));
+      });
+      const isJpeg = MAGIC.jpeg.every((b, i) => headerBytes[i] === b);
+      const isPng  = MAGIC.png.every((b, i) => headerBytes[i] === b);
+      // WebP: "RIFF" nos bytes 0-3 e "WEBP" nos bytes 8-11
+      const isWebp = MAGIC.webp.every((b, i) => headerBytes[i] === b) &&
+                     headerBytes[8]===0x57 && headerBytes[9]===0x45 &&
+                     headerBytes[10]===0x42 && headerBytes[11]===0x50;
+
+      if (!isJpeg && !isPng && !isWebp) {
+        showToast('⚠️ Arquivo inválido. Envie uma imagem JPG, PNG ou WebP real.');
+        throw new Error('Magic number inválido — arquivo não é imagem reconhecida');
       }
-      const extMap = {'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};
-      const ext    = extMap[file.type] || 'jpg';
+      const extMap = { jpeg:'jpg', png:'png', webp:'webp' };
+      const ext = isJpeg ? 'jpg' : isPng ? 'png' : 'webp';
       const foRef  = sRef(storage, `restaurantes/${Date.now()}_${crypto.randomUUID()}.${ext}`);
       await uploadBytes(foRef, fotoInput.files[0]);
       fotoUrl = await getDownloadURL(foRef);
@@ -1096,7 +1257,15 @@ window.salvarRestaurante = async () => {
     const ref = await addDoc(collection(db,'restaurantes'), doc);
     RESTAURANTES.push({ id: ref.id, ...doc });
 
-    // Atualiza role do usuário para 'restaurante' na coleção /usuarios/{uid}
+    // ⚠️  SEGURANÇA: a promoção de role deveria ser feita exclusivamente por
+    // Cloud Function após verificar que o restaurante foi salvo com sucesso.
+    // Aqui mantemos como fallback de UX, mas a CF deve ser a fonte de verdade.
+    // Exemplo:
+    //   exports.onRestaurantCreated = functions.firestore
+    //     .document('restaurantes/{rid}')
+    //     .onCreate((snap, ctx) =>
+    //       admin.firestore().doc(`usuarios/${snap.data().donoId}`)
+    //         .set({ role:'restaurante' }, { merge:true }));
     try {
       const { setDoc, doc: fsDoc } = await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
       await setDoc(fsDoc(db, 'usuarios', auth.currentUser.uid), {
@@ -1208,6 +1377,11 @@ window.abrirReviews = async (restauranteId) => {
         await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
       const snap = await gd(q(col(db, 'restaurantes', restauranteId, 'reviews'),
         ob('criadoEm','desc'), lim(10)));
+      // ⚠️  SEGURANÇA: .filter(aprovada===true) aqui é apenas UI — a regra Firestore
+      // ainda expõe reviews não aprovadas via SDK direto (allow read: if true).
+      // Adicione na regra Firestore:
+      //   match /reviews/{rid} { allow read: if resource.data.aprovada == true; }
+      // Ou leia reviews somente via Cloud Function.
       _reviewsCache[restauranteId] = snap.docs.map(d => ({id:d.id,...d.data()})).filter(rv => rv.aprovada === true);
     } catch(e) {
       _reviewsCache[restauranteId] = [];
@@ -1278,6 +1452,7 @@ window.abrirReviewsInline = async (restauranteId) => {
       const { collection:col, getDocs:gd, query:q, orderBy:ob, limit:lim } =
         await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
       const snap = await gd(q(col(db,'restaurantes',restauranteId,'reviews'), ob('criadoEm','desc'), lim(10)));
+      // ⚠️  Mesma observação de segurança do abrirReviews — leia o comentário acima.
       _reviewsCache[restauranteId] = snap.docs.map(d=>({id:d.id,...d.data()})).filter(rv => rv.aprovada === true);
     } catch { _reviewsCache[restauranteId] = []; }
   }
@@ -1322,7 +1497,7 @@ window.abrirReviewsInline = async (restauranteId) => {
       ${formHTML}
     </div>`;
 
-  // Wire star picker with CSS classes
+  // Wire star picker with CSS classes (hover + click)
   const picker = document.getElementById('sp-'+restauranteId);
   if (picker) {
     picker.querySelectorAll('[data-star]').forEach(btn => {
@@ -1340,17 +1515,6 @@ window.abrirReviewsInline = async (restauranteId) => {
       const btn = e.target.closest('[data-star]');
       if (!btn) return;
       setStar(restauranteId, parseInt(btn.dataset.star));
-    });
-  }
-
-  // Wire star picker
-  const picker = document.getElementById('sp-'+restauranteId);
-  if (picker) {
-    picker.addEventListener('click', e => {
-      const btn = e.target.closest('[data-star]');
-      if (!btn) return;
-      const n = parseInt(btn.dataset.star);
-      setStar(restauranteId, n);
     });
   }
 };
@@ -1395,13 +1559,25 @@ window.enviarReview = async (restauranteId, textareaId, starPickerId) => {
       pendenteSince: sts(),
     });
 
-    // Recalcula rating local (o backend faria isso de forma atômica)
+    // ⚠️  SEGURANÇA: este recálculo de rating no client pode ser manipulado.
+    // Em produção, mova esta lógica para uma Cloud Function com transação atômica:
+    //   exports.onReviewCreated = functions.firestore
+    //     .document('restaurantes/{rid}/reviews/{rvid}')
+    //     .onCreate(async (snap, ctx) => {
+    //       const rRef = db.collection('restaurantes').doc(ctx.params.rid);
+    //       return db.runTransaction(async t => {
+    //         const r = (await t.get(rRef)).data();
+    //         const novoTotal = (r.rating||0)*(r.reviews||0) + snap.data().rating;
+    //         const novoCount = (r.reviews||0) + 1;
+    //         t.update(rRef, { rating: Math.round(novoTotal/novoCount*10)/10, reviews: novoCount });
+    //       });
+    //     });
     const r = RESTAURANTES.find(x => x.id === restauranteId);
     if (r) {
       const oldTotal = (r.rating || 0) * (r.reviews || 0);
       r.reviews = (r.reviews || 0) + 1;
       r.rating  = Math.round((oldTotal + rating) / r.reviews * 10) / 10;
-      // Persiste no Firestore
+      // Persiste no Firestore (só para restaurantes reais, não seeds)
       if (!restauranteId.startsWith('s')) {
         await updateDoc(fd(db,'restaurantes',restauranteId), { rating: r.rating, reviews: r.reviews });
       }
@@ -1473,6 +1649,10 @@ function abrirRestauranteDaURL() {
   // Restaura busca da URL (?q=hamburguer&c=Vitoria) — SEO + compartilhamento
   const qParam = params.get('q');
   const cParam = params.get('c');
+  const pParam = params.get('p');
+  const rParam = params.get('r');
+  const catParam  = params.get('cat');
+  const sortParam = params.get('sort');
   if (qParam) {
     const inp = document.getElementById('main-search');
     if (inp) {
@@ -1487,9 +1667,36 @@ function abrirRestauranteDaURL() {
       if (el) el.value = cDec;
     });
   }
-
-  const rid = params.get('r');
-  if (rid) {
+  if (pParam) {
+    priceFilter = decodeURIComponent(pParam);
+    document.querySelectorAll('.price-btn').forEach(b => b.classList.toggle('active', b.dataset.val === priceFilter));
+  }
+  if (rParam && !params.get('r').match(/^[a-z0-9]{15,}$/i)) { // not a restaurant ID
+    ratingFilter = parseFloat(params.get('r')) || 0;
+    const rs = document.getElementById('rating-slider');
+    if (rs) { rs.value = ratingFilter; }
+    const rv = document.getElementById('rating-val');
+    if (rv) rv.textContent = ratingFilter > 0 ? ratingFilter + '+ ★' : 'Qualquer';
+  }
+  if (params.get('delivery') === '1') { const el = document.getElementById('tog-delivery'); if(el) el.checked = true; }
+  if (params.get('aberto')   === '1') { const el = document.getElementById('tog-aberto');   if(el) el.checked = true; }
+  if (params.get('acess')    === '1') { const el = document.getElementById('tog-acessivel');if(el) el.checked = true; }
+  if (params.get('gluten')   === '1') { const el = document.getElementById('tog-gluten');   if(el) el.checked = true; }
+  if (params.get('promo')    === '1') { const el = document.getElementById('tog-promo');    if(el) el.checked = true; }
+  if (catParam) {
+    currentPill = decodeURIComponent(catParam);
+    document.querySelectorAll('.cat-pill').forEach(b => {
+      const onclick = b.getAttribute('onclick') || '';
+      if (onclick.includes(`'${currentPill}'`)) b.classList.add('active');
+      else b.classList.remove('active');
+    });
+  }
+  if (sortParam) {
+    const sel = document.getElementById('sort-sel');
+    if (sel) sel.value = decodeURIComponent(sortParam);
+  }
+  if (params.get('r') && params.get('r').match(/^[a-z0-9]{15,}$/i)) {
+    const rid = params.get('r');
     // Aguarda restaurantes carregarem (máx 3s, sem vazamento)
     let _urlAttempts = 0;
     const _urlTimer = setInterval(() => {
@@ -1895,56 +2102,142 @@ function restaurarFiltros() {
 /* ── AUTOCOMPLETE NA BUSCA ── */
 function setupAutocomplete() {
   const input = document.getElementById('main-search');
-  if (!input) return;
+  const list  = document.getElementById('autocomplete-list');
+  if (!input || !list) return;
 
-  const list = document.createElement('div');
-  list.id = 'autocomplete-list';
-  list.style.cssText = 'position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--eden-200);border-top:none;border-radius:0 0 var(--radius-lg) var(--radius-lg);box-shadow:var(--shadow-md);z-index:300;display:none;max-height:240px;overflow-y:auto';
-  input.parentElement.style.position = 'relative';
-  input.parentElement.appendChild(list);
+  const CATS = [
+    { label:'Vegano 100%', icon:'🌿', tag:'vegano' },
+    { label:'Hamburguer',  icon:'🍔', tag:'hamburguer' },
+    { label:'Pizza',       icon:'🍕', tag:'pizza' },
+    { label:'Sushi',       icon:'🍣', tag:'sushi' },
+    { label:'Café',        icon:'☕', tag:'cafe' },
+    { label:'Sem Glúten',  icon:'🌾', tag:'sem-gluten' },
+    { label:'Açaí',        icon:'🫐', tag:'acai' },
+    { label:'Árabe',       icon:'🧆', tag:'arabe' },
+    { label:'Fitness',     icon:'💪', tag:'fitness' },
+  ];
 
-  input.addEventListener('input', () => {
-    const q = input.value.trim().toLowerCase();
-    if (q.length < 2) { list.style.display='none'; return; }
+  let focusIdx = -1;
 
-    // Coleta sugestões únicas: nomes + tipos
-    const sugs = new Map();
+  function buildList(q) {
+    const ql = q.toLowerCase();
+    list.innerHTML = '';
+    focusIdx = -1;
+    if (ql.length < 2) { list.style.display = 'none'; return; }
+
+    const restSugs = [];
+    const catSugs  = [];
+    const tagSugs  = [];
+
     RESTAURANTES.forEach(r => {
-      if (r.nome.toLowerCase().includes(q))  sugs.set(r.nome, { label: r.nome, sub: r.cidade, icon: r.emoji||'🌿' });
-      if (r.tipo.toLowerCase().includes(q))  sugs.set('_t_'+r.tipo, { label: r.tipo, sub: 'categoria', icon: '🔍' });
-      (r.tags||[]).forEach(t => { if (t.includes(q)) sugs.set('_tag_'+t, { label: t, sub: 'tag', icon: '🏷️' }); });
+      if (r.nome.toLowerCase().includes(ql))
+        restSugs.push({ label: r.nome, sub: r.cidade + (r.bairro ? ', '+r.bairro : ''), icon: r.emoji||'🌿', valor: r.nome, tipo: 'restaurante' });
+      if (r.tipo.toLowerCase().includes(ql) && !catSugs.find(c => c.label === r.tipo))
+        catSugs.push({ label: r.tipo, sub: 'categoria', icon: '🔍', valor: r.tipo, tipo: 'cat' });
+      (r.tags||[]).forEach(t => {
+        if (t.includes(ql) && !tagSugs.find(s => s.valor === t))
+          tagSugs.push({ label: t, sub: 'tag', icon: '🏷️', valor: t, tipo: 'tag' });
+      });
+    });
+    CATS.forEach(c => {
+      if (c.label.toLowerCase().includes(ql) && !catSugs.find(s => s.valor === c.tag))
+        catSugs.push({ label: c.label, sub: 'categoria', icon: c.icon, valor: c.tag, tipo: 'pill' });
     });
 
-    const items = [...sugs.values()].slice(0, 6);
-    if (!items.length) { list.style.display='none'; return; }
+    const groups = [
+      { titulo: 'Restaurantes', items: restSugs.slice(0,4) },
+      { titulo: 'Categorias',   items: catSugs.slice(0,3)  },
+      { titulo: 'Tags',         items: tagSugs.slice(0,3)  },
+    ].filter(g => g.items.length);
 
-    // BUG FIX: usa data-value (não inline onclick) para suportar apóstrofes e aspas em nomes
-    list.innerHTML = items.map((s, idx) =>
-      `<div data-acvalue="${idx}" style="padding:10px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:14px;border-bottom:1px solid var(--border-light);transition:background .1s">
-        <span style="font-size:18px">${esc(s.icon)}</span>
-        <div><div style="font-weight:600">${esc(s.label)}</div><div style="font-size:11px;color:var(--subtle)">${esc(s.sub)}</div></div>
-      </div>`
-    ).join('');
-    // Armazena os labels como dados (evita XSS via inline string)
-    list.querySelectorAll('[data-acvalue]').forEach((el, idx) => {
-      const s = items[idx];
-      el.addEventListener('mouseover', () => el.style.background = 'var(--eden-50)');
-      el.addEventListener('mouseout',  () => el.style.background = '');
-      el.addEventListener('mousedown', ev => {
-        ev.preventDefault(); // evita blur do input antes do click
-        input.value = s.label;
-        list.style.display = 'none';
-        filterAll();
-        logEvento('autocomplete_select', { label: s.label });
+    if (!groups.length) {
+      list.innerHTML = `<div class="ac-empty">Nenhuma sugestão para "<strong>${esc(q)}</strong>"</div>`;
+      list.style.display = 'block';
+      return;
+    }
+
+    const allItems = [];
+    groups.forEach(g => {
+      const label = document.createElement('div');
+      label.className = 'ac-section-label';
+      label.textContent = g.titulo;
+      list.appendChild(label);
+      g.items.forEach(item => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'ac-item';
+        btn.setAttribute('role', 'option');
+        btn.innerHTML = `
+          <div class="ac-item-icon">${esc(item.icon)}</div>
+          <div class="ac-item-info">
+            <div class="ac-item-nome">${esc(item.label)}</div>
+            <div class="ac-item-sub">${esc(item.sub)}</div>
+          </div>
+          <span class="ac-item-badge">${esc(item.tipo)}</span>`;
+        btn.addEventListener('mousedown', ev => {
+          ev.preventDefault();
+          selecionar(item);
+        });
+        list.appendChild(btn);
+        allItems.push(btn);
       });
     });
     list.style.display = 'block';
+    input.setAttribute('aria-expanded', 'true');
+    return allItems;
+  }
+
+  function selecionar(item) {
+    if (item.tipo === 'pill') {
+      input.value = '';
+      document.getElementById('search-clear').style.display = 'none';
+      const pillBtn = [...document.querySelectorAll('.cat-pill')].find(b =>
+        (b.getAttribute('onclick')||'').includes(`'${item.valor}'`));
+      if (pillBtn) pillBtn.click();
+    } else {
+      input.value = item.label;
+      document.getElementById('search-clear').style.display = 'flex';
+      currentPage = 1;
+      filterAll();
+    }
+    list.style.display = 'none';
+    input.setAttribute('aria-expanded', 'false');
+    logEvento('autocomplete_select', { label: item.label, tipo: item.tipo });
+  }
+
+  let _items = [];
+  input.addEventListener('input', () => {
+    const q = input.value.trim();
+    document.getElementById('search-clear').style.display = q ? 'flex' : 'none';
+    clearTimeout(window._acDebounce);
+    window._acDebounce = setTimeout(() => { _items = buildList(q) || []; }, 160);
+  });
+
+  // Keyboard navigation
+  input.addEventListener('keydown', e => {
+    const visible = list.style.display !== 'none';
+    if (!visible) return;
+    if (e.key === 'Escape') { list.style.display = 'none'; input.setAttribute('aria-expanded','false'); return; }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      focusIdx = Math.min(focusIdx + 1, _items.length - 1);
+      _items.forEach((b,i) => b.classList.toggle('focused', i === focusIdx));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      focusIdx = Math.max(focusIdx - 1, 0);
+      _items.forEach((b,i) => b.classList.toggle('focused', i === focusIdx));
+    } else if (e.key === 'Enter' && focusIdx >= 0) {
+      e.preventDefault();
+      _items[focusIdx]?.dispatchEvent(new MouseEvent('mousedown'));
+    }
   });
 
   document.addEventListener('click', e => {
-    if (!list.contains(e.target) && e.target !== input) list.style.display='none';
+    if (!list.contains(e.target) && e.target !== input) {
+      list.style.display = 'none';
+      input.setAttribute('aria-expanded', 'false');
+    }
   });
-  input.addEventListener('keydown', e => { if (e.key==='Escape') list.style.display='none'; });
 }
 
 /* ── FOCUS TRAP para modais (acessibilidade) ── */
@@ -1984,3 +2277,101 @@ setupPWA();
 setupOfflineDetection();
 setupScrollTop();
 setupAutocomplete();
+
+/* ══════════════════════════════════════════════════════
+   MELHORIA 2 — DEEP LINK: copiar URL com todos os filtros
+══════════════════════════════════════════════════════ */
+window.copiarDeepLink = function() {
+  const url = window.location.href;
+  const toast = document.getElementById('share-toast');
+
+  const showToastDeepLink = (msg) => {
+    if (!toast) return;
+    toast.textContent = msg;
+    toast.classList.add('visible');
+    setTimeout(() => toast.classList.remove('visible'), 2800);
+  };
+
+  if (navigator.share && /Mobi/i.test(navigator.userAgent)) {
+    navigator.share({
+      title: 'EDENA — Restaurantes Veganos',
+      text: 'Veja esses restaurantes veganos no ES:',
+      url
+    }).catch(() => {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(url)
+      .then(() => showToastDeepLink('🔗 Link copiado com seus filtros!'))
+      .catch(() => { showToastDeepLink('🔗 ' + url); });
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    ta.style.cssText = 'position:fixed;top:-999px';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    showToastDeepLink('🔗 Link copiado!');
+  }
+};
+
+/* ══════════════════════════════════════════════════════
+   MELHORIA 4 — SISTEMA DE DENÚNCIAS
+══════════════════════════════════════════════════════ */
+let _denunciaRestId   = null;
+let _denunciaRestNome = null;
+let _denunciaMotivo   = null;
+
+window.abrirDenuncia = function(id, nome) {
+  _denunciaRestId   = id;
+  _denunciaRestNome = nome;
+  _denunciaMotivo   = null;
+  document.getElementById('denuncia-target-nome').textContent = '📍 ' + nome;
+  document.querySelectorAll('.denuncia-motivo').forEach(b => b.classList.remove('selecionado'));
+  document.getElementById('denuncia-obs').value = '';
+  document.getElementById('btn-enviar-denuncia').disabled = true;
+  document.getElementById('denuncia-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+};
+
+window.fecharDenuncia = function() {
+  document.getElementById('denuncia-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+};
+
+window.selecionarMotivo = function(btn, motivo) {
+  document.querySelectorAll('.denuncia-motivo').forEach(b => b.classList.remove('selecionado'));
+  btn.classList.add('selecionado');
+  _denunciaMotivo = motivo;
+  document.getElementById('btn-enviar-denuncia').disabled = false;
+};
+
+window.enviarDenuncia = async function() {
+  if (!_denunciaRestId || !_denunciaMotivo) return;
+
+  const btnEnviar = document.getElementById('btn-enviar-denuncia');
+  btnEnviar.disabled = true;
+  btnEnviar.textContent = '⏳ Enviando...';
+
+  const obs = document.getElementById('denuncia-obs').value.trim().slice(0, 300);
+  const uid = auth.currentUser ? auth.currentUser.uid : 'anonimo';
+
+  try {
+    await addDoc(collection(db, 'denuncias'), {
+      restauranteId:   _denunciaRestId,
+      restauranteNome: _denunciaRestNome,
+      motivo:          _denunciaMotivo,
+      observacao:      obs,
+      uid,
+      criadoEm:        serverTimestamp(),
+      status:          'pendente',
+    });
+    fecharDenuncia();
+    showToast('✅ Denúncia enviada — obrigado por ajudar a comunidade!');
+    logEvento('denuncia_enviada', { restaurant_id: _denunciaRestId, motivo: _denunciaMotivo });
+  } catch (err) {
+    console.error('Erro ao enviar denúncia:', err);
+    btnEnviar.disabled = false;
+    btnEnviar.textContent = '⚠️ Tentar novamente';
+    showToast('❌ Erro ao enviar. Tente novamente.');
+  }
+};
