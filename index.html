@@ -684,6 +684,49 @@ input,select,textarea{font-family:inherit}
   .rec-ingredientes{grid-template-columns:1fr}
   .rec-modal-box{max-height:92vh}
 }
+
+/* ═══════════════════════════════════════════
+   LIGHTBOX — ampliar imagens de upload
+═══════════════════════════════════════════ */
+#lightbox-overlay{
+  position:fixed;inset:0;z-index:9999;
+  background:rgba(0,0,0,.92);
+  display:none;align-items:center;justify-content:center;
+  cursor:zoom-out;
+}
+#lightbox-overlay.open{
+  display:flex;
+  animation:fadeIn .2s var(--ease-out);
+}
+#lightbox-container{
+  position:relative;
+  max-width:92vw;max-height:90vh;
+  display:flex;align-items:center;justify-content:center;
+}
+#lightbox-img{
+  max-width:90vw;max-height:85vh;
+  border-radius:var(--radius-lg);
+  box-shadow:0 24px 80px rgba(0,0,0,.8);
+  object-fit:contain;
+  animation:fadeUp .25s var(--ease-out);
+  cursor:default;
+}
+#lightbox-close{
+  position:absolute;top:-18px;right:-18px;
+  width:40px;height:40px;border-radius:50%;
+  background:var(--eden-700);color:#fff;
+  border:2px solid rgba(255,255,255,.3);
+  font-size:20px;font-weight:700;line-height:1;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all .15s;box-shadow:0 4px 12px rgba(0,0,0,.4);
+  z-index:10001;
+}
+#lightbox-close:hover{background:var(--eden-500);transform:scale(1.1);}
+.img-zoomable{
+  cursor:zoom-in!important;
+  transition:opacity .15s,transform .2s var(--ease-spring);
+}
+.img-zoomable:hover{opacity:.9;transform:scale(1.02);}
 </style>
 </head>
 <body>
@@ -1460,109 +1503,98 @@ document.addEventListener('keydown', function(e){
 recRenderGrid('todos');
 </script>
 
-/* ═══ LIGHTBOX PARA IMAGENS DE UPLOAD ═══ */
-(function initLightbox() {
-  // Criar overlay do lightbox
-  const overlay = document.createElement('div');
+<script>
+/* ═══ LIGHTBOX — ampliar imagens de upload ═══ */
+(function(){
+  'use strict';
+
+  /* --- Criar estrutura HTML do overlay --- */
+  var overlay = document.createElement('div');
   overlay.id = 'lightbox-overlay';
-  overlay.innerHTML = `
-    <div id="lightbox-container">
-      <img id="lightbox-img" src="" alt="Imagem ampliada">
-      <button id="lightbox-close" aria-label="Fechar imagem ampliada">✕</button>
-    </div>
-  `;
+  overlay.setAttribute('role','dialog');
+  overlay.setAttribute('aria-modal','true');
+  overlay.setAttribute('aria-label','Visualizar imagem');
+  overlay.innerHTML =
+    '<div id="lightbox-container">' +
+      '<img id="lightbox-img" src="" alt="">' +
+      '<button id="lightbox-close" aria-label="Fechar">&#10005;</button>' +
+    '</div>';
   document.body.appendChild(overlay);
 
-  const img = document.getElementById('lightbox-img');
-  const closeBtn = document.getElementById('lightbox-close');
+  var lbImg   = document.getElementById('lightbox-img');
+  var lbClose = document.getElementById('lightbox-close');
 
-  function openLightbox(src, alt) {
-    img.src = src;
-    img.alt = alt || 'Imagem ampliada';
+  /* --- Abrir lightbox --- */
+  function abrirLightbox(src, alt) {
+    lbImg.src = src;
+    lbImg.alt = alt || '';
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
+    lbClose.focus();
   }
 
-  function closeLightbox() {
+  /* --- Fechar lightbox --- */
+  function fecharLightbox() {
     overlay.classList.remove('open');
     document.body.style.overflow = '';
-    setTimeout(() => { img.src = ''; }, 300);
+    setTimeout(function(){ lbImg.src = ''; lbImg.alt = ''; }, 300);
   }
 
-  // Fechar ao clicar no overlay (fora da imagem)
-  overlay.addEventListener('click', function(e) {
-    if (e.target === overlay) closeLightbox();
+  /* --- Eventos de fechar --- */
+  overlay.addEventListener('click', function(e){
+    if (e.target === overlay) fecharLightbox();
+  });
+  lbClose.addEventListener('click', fecharLightbox);
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && overlay.classList.contains('open')) fecharLightbox();
   });
 
-  // Fechar ao clicar no botão X
-  closeBtn.addEventListener('click', closeLightbox);
+  /* --- Tornar uma imagem clicável --- */
+  function ativarZoom(img) {
+    if (!img || img.dataset.lbOk) return;  /* já processada */
+    if (img.closest('#lightbox-overlay')) return;
+    if (img.classList.contains('logo-icon')) return;
+    if (img.closest('.logo')) return;
+    if (img.closest('header')) return;
+    if (img.naturalWidth && img.naturalWidth < 60) return;
 
-  // Fechar com Escape
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && overlay.classList.contains('open')) closeLightbox();
-  });
+    img.dataset.lbOk = '1';
+    img.classList.add('img-zoomable');
+    img.addEventListener('click', function(e){
+      e.stopPropagation();
+      abrirLightbox(img.src, img.alt);
+    });
+  }
 
-  // Observer para detectar imagens adicionadas dinamicamente (uploads)
-  const observer = new MutationObserver(function(mutations) {
-    mutations.forEach(function(mutation) {
-      mutation.addedNodes.forEach(function(node) {
-        if (node.nodeType === 1) {
-          // Verificar o próprio nó e seus descendentes
-          const imgs = node.tagName === 'IMG' ? [node] : Array.from(node.querySelectorAll('img'));
-          imgs.forEach(function(imgEl) {
-            makeClickable(imgEl);
-          });
-        }
+  /* --- Varredura inicial --- */
+  function varrerImagens() {
+    document.querySelectorAll('img').forEach(ativarZoom);
+  }
+
+  /* --- Observer para imagens adicionadas dinamicamente --- */
+  var obs = new MutationObserver(function(mutations){
+    mutations.forEach(function(m){
+      m.addedNodes.forEach(function(node){
+        if (node.nodeType !== 1) return;
+        if (node.tagName === 'IMG') { ativarZoom(node); return; }
+        node.querySelectorAll('img').forEach(ativarZoom);
       });
     });
   });
+  obs.observe(document.body, {childList:true, subtree:true});
 
-  observer.observe(document.body, { childList: true, subtree: true });
-
-  // Função para tornar imagem clicável (ampliar)
-  function makeClickable(imgEl) {
-    // Só aplicar a imagens que parecem ser uploads (não logos, não ícones)
-    if (imgEl.classList.contains('logo-icon')) return;
-    if (imgEl.closest('.logo')) return;
-    if (imgEl.closest('header')) return;
-    if (imgEl.width && imgEl.width < 60) return;
-    if (imgEl.closest('.rec-modal-img')) return;
-    if (imgEl.dataset.lightboxDone) return;
-
-    // Verificar se é imagem de conteúdo (uploads do site)
-    const isUploadImg = (
-      imgEl.closest('.rest-card') ||
-      imgEl.closest('.modal-box') ||
-      imgEl.closest('.painel-box') ||
-      imgEl.closest('.cad-box') ||
-      imgEl.src.startsWith('data:image') ||
-      imgEl.src.startsWith('blob:') ||
-      (imgEl.closest('[data-upload]'))
-    );
-
-    if (isUploadImg || (imgEl.src && imgEl.src.length > 200 && !imgEl.classList.contains('logo-icon'))) {
-      imgEl.classList.add('upload-img-clickable');
-      imgEl.dataset.lightboxDone = '1';
-      imgEl.addEventListener('click', function(e) {
-        e.stopPropagation();
-        openLightbox(imgEl.src, imgEl.alt);
-      });
-    }
+  /* --- Inicializar --- */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', varrerImagens);
+  } else {
+    varrerImagens();
   }
 
-  // Expor função globalmente para uso em outras partes do código
-  window.openImageLightbox = openLightbox;
-  window.makeImageClickable = makeClickable;
-
-  // Processar imagens já existentes ao carregar
-  document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('img').forEach(makeClickable);
-  });
-
-  // Também processar agora (caso o DOM já esteja carregado)
-  document.querySelectorAll('img').forEach(makeClickable);
+  /* --- API pública --- */
+  window.abrirLightbox  = abrirLightbox;
+  window.fecharLightbox = fecharLightbox;
 })();
-
 </script>
+
 </body>
 </html>
