@@ -1,0 +1,38 @@
+# ── Ambiente ──────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Firebase Admin (NUNCA comite service accounts) ────────────────
+serviceAccount.json
+*-service-account.json
+firebase-adminsdk*.json
+
+# ── Dependências ──────────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+
+# ── Build Vite ────────────────────────────────────────────────────
+dist/
+dist-ssr/
+*.local
+
+# ── Firebase Emulator ─────────────────────────────────────────────
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+database-debug.log
+
+# ── OS ────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── IDE ───────────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln

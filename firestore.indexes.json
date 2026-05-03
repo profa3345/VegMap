@@ -1,0 +1,143 @@
+{
+  "indexes": [
+
+    // ── Restaurantes: queries de listagem pública ──────────────────
+    // aprovado + criadoEm (paginação padrão)
+    {
+      "collectionGroup": "restaurantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "aprovado",  "order": "ASCENDING" },
+        { "fieldPath": "criadoEm", "order": "DESCENDING" }
+      ]
+    },
+    // aprovado + cidade + criadoEm (filtro por cidade)
+    {
+      "collectionGroup": "restaurantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "aprovado",  "order": "ASCENDING" },
+        { "fieldPath": "cidade",    "order": "ASCENDING" },
+        { "fieldPath": "criadoEm", "order": "DESCENDING" }
+      ]
+    },
+    // aprovado + cidade + rating (ordenar por avaliação)
+    {
+      "collectionGroup": "restaurantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "aprovado", "order": "ASCENDING" },
+        { "fieldPath": "cidade",   "order": "ASCENDING" },
+        { "fieldPath": "rating",   "order": "DESCENDING" }
+      ]
+    },
+    // aprovado + delivery + criadoEm (filtro delivery)
+    {
+      "collectionGroup": "restaurantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "aprovado",  "order": "ASCENDING" },
+        { "fieldPath": "delivery",  "order": "ASCENDING" },
+        { "fieldPath": "criadoEm", "order": "DESCENDING" }
+      ]
+    },
+    // aprovado + destaque + rating (destaque/PRO)
+    {
+      "collectionGroup": "restaurantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "aprovado",  "order": "ASCENDING" },
+        { "fieldPath": "destaque",  "order": "DESCENDING" },
+        { "fieldPath": "rating",    "order": "DESCENDING" }
+      ]
+    },
+    // aprovado + novo + criadoEm (badge novo)
+    {
+      "collectionGroup": "restaurantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "aprovado",  "order": "ASCENDING" },
+        { "fieldPath": "novo",      "order": "DESCENDING" },
+        { "fieldPath": "criadoEm", "order": "DESCENDING" }
+      ]
+    },
+    // aprovado + semgluten + cidade (filtro sem glúten)
+    {
+      "collectionGroup": "restaurantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "aprovado",  "order": "ASCENDING" },
+        { "fieldPath": "semgluten", "order": "ASCENDING" },
+        { "fieldPath": "cidade",    "order": "ASCENDING" },
+        { "fieldPath": "criadoEm", "order": "DESCENDING" }
+      ]
+    },
+    // donoId + criadoEm (painel do dono — lista seus restaurantes)
+    {
+      "collectionGroup": "restaurantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "donoId",   "order": "ASCENDING" },
+        { "fieldPath": "criadoEm","order": "DESCENDING" }
+      ]
+    },
+    // nome_norm + cidade (detecção de duplicatas no cadastro)
+    {
+      "collectionGroup": "restaurantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "nome_norm", "order": "ASCENDING" },
+        { "fieldPath": "cidade",    "order": "ASCENDING" }
+      ]
+    },
+    // novo + criadoEm (trigger de expiração do badge novo)
+    {
+      "collectionGroup": "restaurantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "novo",      "order": "ASCENDING" },
+        { "fieldPath": "criadoEm", "order": "ASCENDING" }
+      ]
+    },
+
+    // ── Reviews: queries de moderação ─────────────────────────────
+    // aprovada + criadoEm (listar pendentes)
+    {
+      "collectionGroup": "reviews",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "aprovada",  "order": "ASCENDING" },
+        { "fieldPath": "criadoEm", "order": "DESCENDING" }
+      ]
+    },
+    // uid + aprovada (verificar se usuário já avaliou)
+    {
+      "collectionGroup": "reviews",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "uid",      "order": "ASCENDING" },
+        { "fieldPath": "aprovada", "order": "ASCENDING" }
+      ]
+    }
+  ],
+
+  "fieldOverrides": [
+    // Desabilita indexação automática de campos longos que nunca são filtrados
+    // para economizar escrita e armazenamento no Firestore
+    {
+      "collectionGroup": "restaurantes",
+      "fieldPath": "descricao",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "restaurantes",
+      "fieldPath": "pratos",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "reviews",
+      "fieldPath": "texto",
+      "indexes": []
+    }
+  ]
+}

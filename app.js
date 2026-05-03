@@ -9,37 +9,46 @@ import { getAuth, signInWithPopup, GoogleAuthProvider,
                                    from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
 import { getAnalytics, logEvent }  from "https://www.gstatic.com/firebasejs/11.1.0/firebase-analytics.js";
 
-/* ── CONFIG ──
- * SEGURANÇA: as credenciais Firebase NÃO devem ficar hardcoded aqui.
- * Injete-as via variáveis de ambiente no build (Vite/Webpack) ou
- * via um endpoint autenticado no backend.
+/* ── CONFIG ──────────────────────────────────────────────────────────────────
+ * Lê as credenciais Firebase das variáveis de ambiente injetadas pelo Vite.
+ * Defina-as em .env.local (nunca comite esse arquivo — veja .env.example).
  *
- * Exemplo com Vite (.env.local — nunca comite esse arquivo):
- *   VITE_FB_API_KEY=AIza...
- *   VITE_FB_PROJECT_ID=vegmap-21101
- *   ...
- *
- * E aqui:
- *   apiKey: import.meta.env.VITE_FB_API_KEY,
- *
- * Restrinja também a apiKey no Firebase Console:
- *   APIs & Services → Credentials → HTTP referrers → adicione seu domínio.
- *
- * Para projetos sem bundler: use um endpoint /api/firebase-config protegido
- * por autenticação ou por verificação de origin no servidor.
- */
+ * A Firebase API key é pública por design — o Google projeta o sistema
+ * assim. A proteção real vem de:
+ *   1. Firestore Security Rules (arquivo firestore.rules)
+ *   2. App Check (bloqueia clientes não autorizados)
+ *   3. Restrição de domínio da key:
+ *      Google Cloud Console → APIs & Services → Credentials →
+ *      sua API key → "Application restrictions" → HTTP referrers →
+ *      adicione: yourdomain.com e *.yourdomain.com
+ * ─────────────────────────────────────────────────────────────────────────── */
 const _fbCfg = (() => {
-  // Tenta ler do objeto global injetado pelo servidor (recomendado em produção)
+  // Modo Vite: lê de import.meta.env (build-time, seguro)
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FB_API_KEY) {
+    return {
+      apiKey:            import.meta.env.VITE_FB_API_KEY,
+      authDomain:        import.meta.env.VITE_FB_AUTH_DOMAIN,
+      projectId:         import.meta.env.VITE_FB_PROJECT_ID,
+      storageBucket:     import.meta.env.VITE_FB_STORAGE_BUCKET,
+      messagingSenderId: import.meta.env.VITE_FB_MESSAGING_SENDER_ID,
+      appId:             import.meta.env.VITE_FB_APP_ID,
+    };
+  }
+  // Modo sem bundler: objeto global injetado pelo servidor no HTML
+  // Ex: <script>window.__FIREBASE_CONFIG__ = JSON.parse('<?= $cfg ?>');</script>
   if (typeof __FIREBASE_CONFIG__ !== 'undefined') return __FIREBASE_CONFIG__;
-  // Fallback para desenvolvimento local — NÃO use em produção
-  console.warn('[EDENA] Firebase config carregada do fallback. Configure variáveis de ambiente.');
+
+  // ── DESENVOLVIMENTO LOCAL SEM VITE ────────────────────────────────────────
+  // Se você não usa Vite ainda, substitua os valores abaixo pelos do seu projeto
+  // e adicione app.js ao .gitignore até migrar para variáveis de ambiente.
+  console.warn('[EDENA] Firebase config em fallback de desenvolvimento. Veja .env.example.');
   return {
-    apiKey:            "AIzaSyAcRZch-DZrHtOZaEBl735iwnFp4Yf4N78",
-    authDomain:        "vegmap-21101.firebaseapp.com",
-    projectId:         "vegmap-21101",
-    storageBucket:     "vegmap-21101.firebasestorage.app",
-    messagingSenderId: "615815897277",
-    appId:             "1:615815897277:web:a58e2d6e4aa798565657d4"
+    apiKey:            "COLE_SUA_API_KEY_AQUI",
+    authDomain:        "COLE_SEU_AUTH_DOMAIN_AQUI",
+    projectId:         "COLE_SEU_PROJECT_ID_AQUI",
+    storageBucket:     "COLE_SEU_STORAGE_BUCKET_AQUI",
+    messagingSenderId: "COLE_SEU_SENDER_ID_AQUI",
+    appId:             "COLE_SEU_APP_ID_AQUI",
   };
 })();
 const FB = initializeApp(_fbCfg);
@@ -116,7 +125,7 @@ function agendarAtualizacaoAberto() {
     atualizarStatusAberto();
     setInterval(atualizarStatusAberto, 60 * 60 * 1000);
   }, msAteProximaHora);
-} */
+}
 const SEED = [
   {id:'s1',  nome:"Verde Vivo",          tipo:"Restaurante Vegano",           cidade:"Vitoria",    bairro:"Praia do Canto",    emoji:"🌿", rating:4.9, reviews:312, preco:"$$",  delivery:true,  aberto:true,  acessivel:true,  semgluten:false, novo:false, destaque:true,  promo:false, tags:["vegano","por-quilo","almoço"],              descricao:"O restaurante vegano mais premiado de Vitória.",           horario:"Seg-Sex 11h-15h | Sex-Dom 18h-22h", telefone:"(27) 3344-1234", lat:-20.273, lng:-40.297, pratos:[{nome:"Feijoada Vegana",        desc:"Grãos, proteína vegetal, couve",preco:"R$ 38"},{nome:"Prato Executivo",      desc:"Arroz integral + proteína + 3 saladas",preco:"R$ 32"}]},
   {id:'s2',  nome:"Raízes Café",          tipo:"Café & Confeitaria Vegana",    cidade:"Vitoria",    bairro:"Jardim da Penha",   emoji:"☕", rating:4.8, reviews:198, preco:"$",   delivery:true,  aberto:true,  acessivel:true,  semgluten:true,  novo:false, destaque:false, promo:true,  tags:["café","confeitaria","vegano","sem-gluten"],  descricao:"Café vegano especializado em bolos e bebidas artesanais.", horario:"Seg-Dom 7h-20h",             telefone:"(27) 3311-4422", lat:-20.261, lng:-40.289, pratos:[{nome:"Cappuccino de Aveia",     desc:"Leite de aveia artesanal",     preco:"R$ 14"},{nome:"Bolo de Limão",        desc:"Bolo vegano com cobertura",    preco:"R$ 12"}]},
@@ -294,6 +303,14 @@ async function carregarRestaurantes(resetar = true) {
     _todosCarregados  = false;
   }
   mostrarSkeleton();
+
+  // ── SEED: APENAS em ambiente de desenvolvimento ──────────────────────────
+  // Em produção, o Firestore é a única fonte de verdade.
+  // SEED serve apenas para desenvolvimento local sem dados reais no Firestore.
+  // Para popular o Firestore com dados iniciais, use o script de seed no Cloud
+  // Functions ou no painel Firebase Console — nunca misture aqui em produção.
+  const IS_DEV = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
   try {
     const { query: q, collection: col, orderBy: ob, startAfter, limit: lim } =
       await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
@@ -307,19 +324,35 @@ async function carregarRestaurantes(resetar = true) {
     if (snap.docs.length < PAGE_SIZE) _todosCarregados = true;
     if (snap.docs.length > 0) _lastFirestoreDoc = snap.docs[snap.docs.length - 1];
 
-    const seedIds = new Set(SEED.map(s => s.id));
-    const novos   = remote.filter(r => !seedIds.has(r.id));
-
+    // Em produção: apenas dados do Firestore
+    // Em DEV com Firestore vazio: complementa com SEED marcados como demo
     if (resetar) {
-      RESTAURANTES = [...SEED, ...novos];
+      if (IS_DEV && remote.length === 0) {
+        // DEV sem dados: usa SEED com flag visual de demo
+        RESTAURANTES = SEED.map(s => ({ ...s, _isSeed: true }));
+        console.info('[EDENA DEV] Firestore vazio — exibindo dados de demonstração (SEED).');
+      } else {
+        // PRODUÇÃO ou DEV com dados reais: apenas Firestore
+        const seedIds = IS_DEV ? new Set(SEED.map(s => s.id)) : new Set();
+        RESTAURANTES = remote.filter(r => !seedIds.has(r.id));
+      }
     } else {
-      // Append: evita duplicatas por id
+      // Append página seguinte: evita duplicatas por id
       const existIds = new Set(RESTAURANTES.map(r => r.id));
-      RESTAURANTES = [...RESTAURANTES, ...novos.filter(r => !existIds.has(r.id))];
+      RESTAURANTES = [...RESTAURANTES, ...remote.filter(r => !existIds.has(r.id))];
     }
   } catch(e) {
-    console.warn('Firestore indisponível, usando dados locais:', e.message);
-    if (resetar) RESTAURANTES = [...SEED];
+    console.warn('Firestore indisponível:', e.message);
+    if (resetar) {
+      // Fallback: SEED apenas em DEV, lista vazia em produção
+      if (IS_DEV) {
+        RESTAURANTES = SEED.map(s => ({ ...s, _isSeed: true }));
+        showToast('⚠️ Modo offline — exibindo dados de demonstração.');
+      } else {
+        RESTAURANTES = [];
+        showToast('⚠️ Erro ao carregar dados. Tente novamente em instantes.');
+      }
+    }
     _todosCarregados = true;
   }
   calcularDistancias(); // popula _dist se geoloc já estava ativa
@@ -717,8 +750,9 @@ function criarCard(r) {
   const listCls   = currentView === 'list' ? ' rest-card-list' : '';
   const distBadge = (r._dist != null)
     ? `<span class="card-dist">📍 ${r._dist.toFixed(1)} km</span>` : '';
-  const fotoEl    = r.fotoUrl
-    ? `<img class="card-photo lazy-img" data-src="${esc(r.fotoUrl)}" alt="${esc(r.nome)}" loading="lazy" style="opacity:0;transition:opacity .3s">` : '';
+  const safeFotoUrlCard = (r.fotoUrl && /^https:\/\//i.test(r.fotoUrl)) ? r.fotoUrl : null;
+  const fotoEl    = safeFotoUrlCard
+    ? `<img class="card-photo lazy-img" data-src="${esc(safeFotoUrlCard)}" alt="${esc(r.nome)}" loading="lazy" style="opacity:0;transition:opacity .3s">` : '';
 
   const card = document.createElement('div');
   card.className = `rest-card${listCls}`;
@@ -731,6 +765,7 @@ function criarCard(r) {
       <div class="card-img-inner" aria-hidden="true">${esc(r.emoji||'🌿')}</div>
       ${fotoEl}
       <div class="card-badges">
+        ${r._isSeed ? '<span class="badge" style="background:#f3f0ff;color:#6d28d9;border:1px solid #ddd6fe" title="Dado de demonstração — não é um estabelecimento real">🧪 Demo</span>' : ''}
         ${r.destaque ? '<span class="badge badge-destaque">⭐ Destaque</span>' : ''}
         ${r.topSemana? '<span class="badge badge-top">🏆 Top semana</span>'   : ''}
         ${r.novo     ? '<span class="badge badge-novo">✨ Novo</span>'        : ''}
@@ -912,8 +947,10 @@ window.openModal = id => {
     : `https://www.google.com/maps/search/${encodeURIComponent(r.nome+' '+r.cidade)}`;
 
   const wppTel = r.telefone ? r.telefone.replace(/\D/g,'') : '';
-  const fotoEl = r.fotoUrl
-    ? `<img src="${esc(r.fotoUrl)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" alt="${esc(r.nome)}">` : '';
+  // Valida que fotoUrl começa com https:// para evitar injeção via javascript:
+  const safeFotoUrl = (r.fotoUrl && /^https:\/\//i.test(r.fotoUrl)) ? r.fotoUrl : null;
+  const fotoEl = safeFotoUrl
+    ? `<img src="${esc(safeFotoUrl)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" alt="${esc(r.nome)}">` : '';
 
   document.getElementById('modal-content').innerHTML = `
     <div class="modal-hero" aria-hidden="true">${esc(r.emoji||'🌿')}${fotoEl}</div>
@@ -1524,7 +1561,7 @@ window.enviarReviewInline = (rid) => enviarReview(rid, 'rt-'+rid, 'sp-'+rid);
 let _starRatings = {}; // { restauranteId: number }
 window.setStar = (rid, n) => {
   _starRatings[rid] = n;
-  const picker = document.getElementById(`star-picker-${rid}`);
+  const picker = document.getElementById(`sp-${rid}`);
   if (!picker) return;
   picker.querySelectorAll('[data-star]').forEach(btn => {
     btn.style.color = parseInt(btn.dataset.star) <= n ? 'var(--gold-400)' : 'var(--border)';
@@ -1574,9 +1611,11 @@ window.enviarReview = async (restauranteId, textareaId, starPickerId) => {
     //     });
     const r = RESTAURANTES.find(x => x.id === restauranteId);
     if (r) {
-      const oldTotal = (r.rating || 0) * (r.reviews || 0);
-      r.reviews = (r.reviews || 0) + 1;
-      r.rating  = Math.round((oldTotal + rating) / r.reviews * 10) / 10;
+      const oldCount = r.reviews || 0;
+      const oldTotal = (r.rating || 0) * oldCount;
+      const newCount = oldCount + 1;
+      r.reviews = newCount;
+      r.rating  = Math.round((oldTotal + rating) / newCount * 10) / 10;
       // Persiste no Firestore (só para restaurantes reais, não seeds)
       if (!restauranteId.startsWith('s')) {
         await updateDoc(fd(db,'restaurantes',restauranteId), { rating: r.rating, reviews: r.reviews });
@@ -1707,11 +1746,164 @@ function abrirRestauranteDaURL() {
   }
 }
 
+/* ── PAINEL ADMIN — moderação de restaurantes e reviews ── */
+window.abrirPainelAdmin = async () => {
+  if (currentUserRole !== 'admin') { showToast('⚠️ Acesso restrito.'); return; }
+  const overlay = document.getElementById('painel-overlay');
+  const box     = document.getElementById('painel-box');
+  if (!overlay || !box) return;
+
+  box.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2 style="margin:0">👑 Painel Admin</h2>
+      <button onclick="fecharPainel()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted)">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:20px">
+      <button class="admin-tab" onclick="adminMostrarAba('restaurantes',this)"
+        style="padding:8px 16px;border-radius:var(--radius-pill);border:none;cursor:pointer;background:var(--eden-500);color:#fff">
+        🍽️ Restaurantes pendentes
+      </button>
+      <button class="admin-tab" onclick="adminMostrarAba('reviews',this)"
+        style="padding:8px 16px;border-radius:var(--radius-pill);border:1px solid var(--border);cursor:pointer;background:var(--bg);color:var(--text)">
+        💬 Reviews pendentes
+      </button>
+    </div>
+    <div id="admin-conteudo"><div style="text-align:center;padding:40px;color:var(--muted)">Carregando…</div></div>`;
+
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+  await adminCarregarRestaurantes();
+};
+
+window.adminMostrarAba = async (aba, btn) => {
+  document.querySelectorAll('.admin-tab').forEach(b => {
+    b.style.background = 'var(--bg)'; b.style.color = 'var(--text)'; b.style.border = '1px solid var(--border)';
+  });
+  btn.style.background = 'var(--eden-500)'; btn.style.color = '#fff'; btn.style.border = 'none';
+  if (aba === 'restaurantes') await adminCarregarRestaurantes();
+  else await adminCarregarReviews();
+};
+
+async function adminCarregarRestaurantes() {
+  const cont = document.getElementById('admin-conteudo');
+  if (!cont) return;
+  cont.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">Carregando…</div>';
+  try {
+    const { query: q, collection: col, where, getDocs: gd } =
+      await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
+    const snap = await gd(q(col(db, 'restaurantes'), where('aprovado', '==', false)));
+    if (snap.empty) {
+      cont.innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px">✅ Nenhum restaurante pendente.</p>';
+      return;
+    }
+    cont.innerHTML = snap.docs.map(d => {
+      const r = d.data();
+      return `
+        <div style="border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+            <div>
+              <strong>${esc(r.nome||'—')}</strong>
+              <span style="color:var(--muted);font-size:13px;margin-left:8px">${esc(r.cidade||'')}${r.bairro?', '+esc(r.bairro):''}</span><br>
+              <span style="font-size:13px;color:var(--muted)">${esc(r.tipo||'')} · ${esc(r.donoEmail||'—')}</span>
+            </div>
+            <div style="display:flex;gap:8px;flex-shrink:0">
+              <button onclick="adminAprovar('${d.id}')"
+                style="padding:6px 14px;background:var(--eden-500);color:#fff;border:none;border-radius:var(--radius-pill);cursor:pointer;font-size:13px">✅ Aprovar</button>
+              <button onclick="adminRejeitar('${d.id}')"
+                style="padding:6px 14px;background:#fef2f2;color:#991b1b;border:1px solid #fecaca;border-radius:var(--radius-pill);cursor:pointer;font-size:13px">🗑️ Rejeitar</button>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    cont.innerHTML = `<p style="color:#991b1b;padding:20px">Erro: ${esc(e.message)}</p>`;
+  }
+}
+
+window.adminAprovar = async (id) => {
+  try {
+    const { doc: fd2, updateDoc } = await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
+    await updateDoc(fd2(db, 'restaurantes', id), { aprovado: true });
+    showToast('✅ Restaurante aprovado e publicado!');
+    await adminCarregarRestaurantes();
+    await carregarRestaurantes();
+  } catch(e) { showToast('Erro: ' + e.message); }
+};
+
+window.adminRejeitar = async (id) => {
+  if (!confirm('Rejeitar e excluir este restaurante permanentemente?')) return;
+  try {
+    const { doc: fd2, deleteDoc } = await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
+    await deleteDoc(fd2(db, 'restaurantes', id));
+    showToast('🗑️ Restaurante rejeitado.');
+    await adminCarregarRestaurantes();
+    await carregarRestaurantes();
+  } catch(e) { showToast('Erro: ' + e.message); }
+};
+
+async function adminCarregarReviews() {
+  const cont = document.getElementById('admin-conteudo');
+  if (!cont) return;
+  cont.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">Carregando…</div>';
+  try {
+    const { query: q, collectionGroup, where, getDocs: gd } =
+      await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
+    const snap = await gd(q(collectionGroup(db, 'reviews'), where('aprovada', '==', false)));
+    if (snap.empty) {
+      cont.innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px">✅ Nenhuma review pendente.</p>';
+      return;
+    }
+    cont.innerHTML = snap.docs.map(d => {
+      const rv = d.data();
+      const safePath = d.ref.path.replace(/'/g, "\'");
+      return `
+        <div style="border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+            <div>
+              <strong>${'★'.repeat(rv.rating||0)}</strong>
+              <span style="color:var(--muted);font-size:12px;margin-left:6px">${esc(rv.userName||'Anônimo')}</span><br>
+              <span style="font-size:13px">${esc(rv.texto||'(sem texto)')}</span>
+            </div>
+            <div style="display:flex;gap:8px;flex-shrink:0">
+              <button onclick="adminAprovarReview('${safePath}')"
+                style="padding:6px 14px;background:var(--eden-500);color:#fff;border:none;border-radius:var(--radius-pill);cursor:pointer;font-size:13px">✅ Aprovar</button>
+              <button onclick="adminRejeitarReview('${safePath}')"
+                style="padding:6px 14px;background:#fef2f2;color:#991b1b;border:1px solid #fecaca;border-radius:var(--radius-pill);cursor:pointer;font-size:13px">🗑️ Rejeitar</button>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    cont.innerHTML = `<p style="color:#991b1b;padding:20px">Erro: ${esc(e.message)}</p>`;
+  }
+}
+
+window.adminAprovarReview = async (path) => {
+  try {
+    const { doc: fd2, updateDoc } = await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
+    await updateDoc(fd2(db, path), { aprovada: true });
+    showToast('✅ Review aprovada!');
+    await adminCarregarReviews();
+  } catch(e) { showToast('Erro: ' + e.message); }
+};
+
+window.adminRejeitarReview = async (path) => {
+  if (!confirm('Rejeitar e excluir esta review?')) return;
+  try {
+    const { doc: fd2, deleteDoc } = await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
+    await deleteDoc(fd2(db, path));
+    showToast('🗑️ Review removida.');
+    await adminCarregarReviews();
+  } catch(e) { showToast('Erro: ' + e.message); }
+};
+
 /* ── PAINEL DO DONO ── */
 let meusRestaurantes = [];
 
 window.abrirPainel = async () => {
   if (!auth.currentUser) { abrirLogin(); return; }
+  // Admin vai direto para o painel de moderação
+  if (currentUserRole === 'admin') { await abrirPainelAdmin(); return; }
   document.getElementById('painel-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
   await carregarMeusRestaurantes();
@@ -1750,8 +1942,28 @@ async function carregarMeusRestaurantes() {
     return;
   }
 
-  listEl.innerHTML = meusRestaurantes.map(r => `
-    <div class="meu-rest-card" onclick="fecharPainel();openModal('${esc(r.id)}')">
+  // Índice do restaurante selecionado para os controles do painel
+  let _painelIdx = 0;
+
+  function renderPainelControles(idx) {
+    const r = meusRestaurantes[idx];
+    if (!r) return;
+    _painelIdx = idx;
+    document.getElementById('promo-section').style.display = 'block';
+    document.getElementById('tog-promo-ativo').checked = !!r.promo;
+    const btnAberto = document.getElementById('btn-toggle-aberto');
+    const aberto = !!r.aberto;
+    document.getElementById('aberto-icon').textContent  = aberto ? '🔴' : '🟢';
+    document.getElementById('aberto-label').textContent = aberto ? 'Marcar como fechado' : 'Marcar como aberto agora';
+    if (btnAberto) btnAberto.onclick = () => toggleAberto(r);
+    // Destaca card selecionado
+    listEl.querySelectorAll('.meu-rest-card').forEach((el, i) => {
+      el.style.outline = i === idx ? '2px solid var(--eden-400)' : '';
+    });
+  }
+
+  listEl.innerHTML = meusRestaurantes.map((r, idx) => `
+    <div class="meu-rest-card" data-painel-idx="${idx}" style="cursor:pointer">
       <div class="meu-rest-emoji">${esc(r.emoji||'🌿')}</div>
       <div class="meu-rest-info">
         <div class="meu-rest-nome">${esc(r.nome)}</div>
@@ -1761,26 +1973,28 @@ async function carregarMeusRestaurantes() {
           ${r.promo?'<span class="status-pill" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a">🔥 Em promoção</span>':''}
           ${r.aberto?'<span class="status-pill" style="background:var(--eden-50);color:var(--eden-700);border:1px solid var(--eden-200)">🟢 Aberto</span>':'<span class="status-pill" style="background:#fef2f2;color:#991b1b;border:1px solid #fecaca">🔴 Fechado</span>'}
         </div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button onclick="event.stopPropagation();fecharPainel();openModal('${esc(r.id)}')"
+            style="font-size:11px;padding:4px 10px;border-radius:var(--radius-pill);border:1px solid var(--border);background:var(--bg);color:var(--muted);cursor:pointer">
+            Ver perfil →
+          </button>
+        </div>
       </div>
     </div>`).join('');
 
-  // Exibe seção de promoção para o primeiro restaurante
-  const primeiro = meusRestaurantes[0];
-  document.getElementById('promo-section').style.display = 'block';
-  document.getElementById('tog-promo-ativo').checked = !!primeiro.promo;
+  // Clique no card seleciona para os controles (aberto/promo)
+  listEl.querySelectorAll('.meu-rest-card').forEach((el, i) => {
+    el.addEventListener('click', () => renderPainelControles(i));
+  });
 
-  // Stats simuladas (futuramente virão do Firestore)
-  document.getElementById('ps-views').textContent = Math.floor(Math.random()*80+20);
-  document.getElementById('ps-favs').textContent  = Math.floor(Math.random()*15+3);
-  document.getElementById('ps-wpp').textContent   = Math.floor(Math.random()*12+1);
-  document.getElementById('ps-maps').textContent  = Math.floor(Math.random()*18+2);
+  // Stats: em breve via Firestore. Por ora exibe placeholder estático
+  ['ps-views','ps-favs','ps-wpp','ps-maps'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = '—'; el.title = 'Analytics em breve'; }
+  });
 
-  // Botão aberto/fechado
-  const btnAberto = document.getElementById('btn-toggle-aberto');
-  const aberto = !!primeiro.aberto;
-  document.getElementById('aberto-icon').textContent  = aberto ? '🔴' : '🟢';
-  document.getElementById('aberto-label').textContent = aberto ? 'Marcar como fechado' : 'Marcar como aberto agora';
-  btnAberto.onclick = () => toggleAberto(primeiro);
+  // Renderiza controles para o primeiro restaurante por padrão
+  renderPainelControles(0);
 }
 
 async function toggleAberto(r) {
@@ -2269,6 +2483,30 @@ setupFocusTrap('planos-overlay', '#planos-box');
 const _pillFavInit = document.getElementById('pill-favoritos');
 if (_pillFavInit && favorites.size > 0) {
   _pillFavInit.querySelector('.emoji').textContent = `❤️ ${favorites.size}`;
+}
+
+// ── GEO: solicita localização imediatamente para ordenar por distância ──
+// Pede permissão silenciosamente sem bloquear a UI.
+// Se negada, o app funciona normalmente sem ordenação por distância.
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      userLat = pos.coords.latitude;
+      userLng = pos.coords.longitude;
+      calcularDistancias();
+      invalidarCacheSort();
+      // Muda ordenação padrão para distância se o usuário ainda não escolheu
+      const sortSel = document.getElementById('sort-sel');
+      if (sortSel && sortSel.value === 'rating') sortSel.value = 'dist';
+      const geoStatus = document.getElementById('geo-status');
+      const geoLabel  = document.getElementById('geo-label');
+      if (geoStatus) geoStatus.classList.add('visible');
+      if (geoLabel)  geoLabel.textContent = 'Localização ativa 📍';
+      filterAll();
+    },
+    () => { /* permissão negada — funciona sem geo, sem mensagem de erro */ },
+    { timeout: 8000, maximumAge: 300000 } // aceita cache de posição de até 5min
+  );
 }
 
 carregarRestaurantes();
